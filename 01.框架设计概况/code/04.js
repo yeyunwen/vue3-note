@@ -2,6 +2,21 @@ const bucket = new WeakMap(); // 之所以用WeakMap，是因为WeakMap是弱引
 let activeEffect = null;
 const effectStack = [];
 
+const jobQueue = new Set();
+const p = Promise.resolve();
+
+let isFlushing = false;
+const flushJobs = () => {
+  if (isFlushing) return;
+  isFlushing = true;
+  // job是异步任务，因此需要同步代码都执行完后，在下一轮事件循环中执行
+  p.then(() => {
+    jobQueue.forEach((job) => job());
+  }).finally(() => {
+    isFlushing = false;
+  });
+};
+
 const cleanup = (effectFn) => {
   for (const deps of effectFn.deps) {
     deps.delete(effectFn);
@@ -9,7 +24,7 @@ const cleanup = (effectFn) => {
   effectFn.deps.length = 0;
 };
 
-const effect = (fn) => {
+const effect = (fn, options = {}) => {
   const effectFn = () => {
     cleanup(effectFn);
     activeEffect = effectFn;
@@ -21,6 +36,7 @@ const effect = (fn) => {
     activeEffect = effectStack[effectStack.length - 1];
   };
   effectFn.deps = [];
+  effectFn.options = options;
 
   effectFn();
 };
@@ -52,7 +68,13 @@ const trigger = (target, key) => {
     }
   });
 
-  depsToRun.forEach((effectFn) => effectFn());
+  depsToRun.forEach((effectFn) => {
+    if (effectFn.options.scheduler) {
+      effectFn.options.scheduler(effectFn);
+    } else {
+      effectFn();
+    }
+  });
 };
 
 const data = {
@@ -96,7 +118,25 @@ const obj = new Proxy(data, {
 //#endregion
 
 //#region 避免无限递归
-effect(() => {
-  obj.foo++;
-});
+// effect(() => {
+//   obj.foo++;
+// });
+//#endregion
+
+//#region 调度执行
+effect(
+  () => {
+    console.log(obj.foo);
+  },
+  {
+    scheduler(fn) {
+      jobQueue.add(fn);
+      flushJobs();
+    },
+  }
+);
+
+obj.foo++;
+obj.foo++;
+// console.log("end");
 //#endregion
