@@ -30,15 +30,20 @@ const effect = (fn, options = {}) => {
     activeEffect = effectFn;
     effectStack.push(effectFn);
 
-    fn();
-
+    const res = fn();
+    console.log("effectFn");
     effectStack.pop();
     activeEffect = effectStack[effectStack.length - 1];
+
+    return res;
   };
   effectFn.deps = [];
   effectFn.options = options;
+  if (!effectFn.options.lazy) {
+    effectFn();
+  }
 
-  effectFn();
+  return effectFn;
 };
 
 const track = (target, key) => {
@@ -77,9 +82,37 @@ const trigger = (target, key) => {
   });
 };
 
+const computed = (getter) => {
+  let value;
+  let dirty = true;
+
+  const effectFn = effect(getter, {
+    lazy: true,
+    scheduler: () => {
+      if (!dirty) {
+        // 只有在依赖发生改变时才会执行，即触发trigger时，才会恢复计算, 这里还用到了闭包。🐮！！！
+        dirty = true;
+        trigger(obj, "value");
+      }
+    },
+  });
+
+  return {
+    get value() {
+      if (dirty) {
+        value = effectFn();
+        dirty = false;
+      }
+
+      track(obj, "value");
+      return value;
+    },
+  };
+};
+
 const data = {
   foo: 1,
-  bar: true,
+  bar: 2,
 };
 
 const obj = new Proxy(data, {
@@ -124,19 +157,38 @@ const obj = new Proxy(data, {
 //#endregion
 
 //#region 调度执行
-effect(
-  () => {
-    console.log(obj.foo);
-  },
-  {
-    scheduler(fn) {
-      jobQueue.add(fn);
-      flushJobs();
-    },
-  }
-);
+// effect(
+//   () => {
+//     console.log(obj.foo);
+//   },
+//   {
+//     scheduler(fn) {
+//       jobQueue.add(fn);
+//       flushJobs();
+//     },
+//   }
+// );
 
-obj.foo++;
-obj.foo++;
+// obj.foo++;
+// obj.foo++;
 // console.log("end");
+//#endregion
+
+// #region 懒执行
+// const effectFn = effect(() => obj.foo + obj.bar, {
+//   lazy: true,
+// });
+// #endregion
+
+// #region 计算属性 computed
+// const doubleFoo = computed(() => obj.foo * 2);
+// console.log(doubleFoo.value);
+// obj.foo = 2;
+// doubleFoo.value;
+
+// const sumRefs = computed(() => obj.foo + obj.bar);
+
+// effect(() => {
+//   console.log(sumRefs.value);
+// });
 //#endregion
