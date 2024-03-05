@@ -14,7 +14,9 @@ const effect = (fn) => {
     cleanup(effectFn);
     activeEffect = effectFn;
     effectStack.push(effectFn);
+
     fn();
+
     effectStack.pop();
     activeEffect = effectStack[effectStack.length - 1];
   };
@@ -42,12 +44,19 @@ const trigger = (target, key) => {
   const depsMap = bucket.get(target);
   if (!depsMap) return;
   const deps = depsMap.get(key);
+
   const depsToRun = new Set(deps);
-  depsToRun.forEach((fn) => fn());
+  depsToRun.forEach((effectFn) => {
+    if (effectFn === activeEffect) {
+      depsToRun.delete(effectFn);
+    }
+  });
+
+  depsToRun.forEach((effectFn) => effectFn());
 };
 
 const data = {
-  foo: true,
+  foo: 1,
   bar: true,
 };
 
@@ -72,16 +81,22 @@ const obj = new Proxy(data, {
 // #endregion
 
 //#region  嵌套 effect
-let temp1, temp2;
+// let temp1, temp2;
 
-effect(function effect1() {
-  console.log("effect1");
+// effect(function effect1() {
+//   console.log("effect1");
 
-  effect(function effect2() {
-    console.log("effect2");
-    temp2 = obj.bar;
-  });
+//   effect(function effect2() {
+//     console.log("effect2");
+//     temp2 = obj.bar;
+//   });
 
-  temp1 = obj.foo;
+//   temp1 = obj.foo;
+// });
+//#endregion
+
+//#region 避免无限递归
+effect(() => {
+  obj.foo++;
 });
 //#endregion
