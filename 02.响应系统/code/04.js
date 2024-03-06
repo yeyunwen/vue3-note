@@ -130,7 +130,7 @@ const traverse = (value, seen = new Set()) => {
   }
 };
 
-const watch = (source, cb) => {
+const watch = (source, cb, options = {}) => {
   let getter;
   if (typeof source === "function") {
     getter = source;
@@ -138,18 +138,39 @@ const watch = (source, cb) => {
     getter = () => traverse(source);
   }
   let oldValue, newValue;
+  // 用来存储用户注册的过期回调
+  let cleanup;
+  const onInvalidate = (fn) => {
+    cleanup = fn;
+  };
+
+  const job = () => {
+    if (cleanup) {
+      cleanup();
+    }
+    newValue = effectFn();
+    cb(newValue, oldValue, onInvalidate);
+    oldValue = newValue;
+  };
   const effectFn = effect(() => getter(), {
     // 开启懒执行，返回副作用函数
     lazy: true,
-    scheduler() {
-      newValue = effectFn();
-      cb(newValue, oldValue);
-      oldValue = newValue;
+    scheduler: () => {
+      if (options.flush === "post") {
+        const p = Promise.resolve();
+        p.then(job);
+      } else {
+        job();
+      }
     },
   });
   // 初始化时执行一次拿到旧值，并进行依赖收集
   // 调用副作用函数，拿到用户传入副作用函数（getter）的返回值
-  oldValue = effectFn();
+  if (options.immediate) {
+    job();
+  } else {
+    oldValue = effectFn();
+  }
 };
 
 const data = {
@@ -238,9 +259,19 @@ const obj = new Proxy(data, {
 //#region watch
 watch(
   () => obj.foo,
-  (newValue, oldValue) => {
+  (newValue, oldValue, onInvalidate) => {
     console.log("newValue: ", newValue);
     console.log("odlValue: ", oldValue);
+    onInvalidate(() => {
+      console.log("onInvalidate");
+    });
+  },
+  {
+    immediate: true,
+    flush: "post",
   }
 );
-//#endregionx
+
+// obj.foo++;
+console.log("sync");
+//#endregion
