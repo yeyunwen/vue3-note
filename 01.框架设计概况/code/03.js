@@ -1,3 +1,4 @@
+// 渲染器
 function renderer(vnode, container) {
   const { tag, props, children } = vnode;
 
