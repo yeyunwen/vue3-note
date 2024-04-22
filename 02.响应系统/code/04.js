@@ -212,7 +212,7 @@ const TriggerType = {
   DELETE: "DELETE",
 };
 
-export const createReactive = (obj, isShallow = false) => {
+export const createReactive = (obj, isShallow = false, isReadonly = false) => {
   return new Proxy(obj, {
     get(target, key, receiver) {
       if (key === "raw") {
@@ -221,17 +221,24 @@ export const createReactive = (obj, isShallow = false) => {
 
       const res = Reflect.get(target, key, receiver);
 
-      track(target, key);
+      if (!isReadonly) {
+        track(target, key);
+      }
 
       if (isShallow) {
         return res;
       }
       if (typeof res === "object" && res !== null) {
-        return reactive(res);
+        return isReadonly ? readonly(res) : reactive(res);
       }
       return res;
     },
     set(target, key, newValue, receiver) {
+      if (isReadonly) {
+        console.warn(`属性${key}是只读的`);
+        return true;
+      }
+
       const oldValue = target[key];
       const type = Object.prototype.hasOwnProperty.call(target, key)
         ? TriggerType.SET
@@ -261,6 +268,10 @@ export const createReactive = (obj, isShallow = false) => {
     },
     // 支持 for...in 操作
     deleteProperty(target, key) {
+      if (isReadonly) {
+        console.warn(`属性${key}是只读的`);
+        return true;
+      }
       const hasKey = Object.prototype.hasOwnProperty.call(target, key);
       const res = Reflect.deleteProperty(target, key);
 
@@ -279,6 +290,14 @@ export const reactive = (obj) => {
 
 export const shallowReactive = (obj) => {
   return createReactive(obj, true);
+};
+
+export const readonly = (obj) => {
+  return createReactive(obj, false, true);
+};
+
+export const shallowReadonly = (obj) => {
+  return createReactive(obj, true, true);
 };
 
 //#region 分支切换与cleanup

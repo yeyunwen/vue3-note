@@ -1,4 +1,10 @@
-import { reactive, shallowReactive, effect } from "./04.js";
+import {
+  reactive,
+  shallowReactive,
+  readonly,
+  shallowReadonly,
+  effect,
+} from "./04.js";
 
 //#region 代理Object
 // const obj = {
@@ -63,13 +69,29 @@ import { reactive, shallowReactive, effect } from "./04.js";
 
 //#region 浅响应与深响应
 
+// const obj = {
+//   foo: {
+//     bar: 1,
+//   },
+// };
+
+// const p = shallowReactive(obj);
+
+// effect(() => {
+//   console.log(p.foo.bar);
+// });
+
+// p.foo.bar = 2;
+//#endregion
+
+// #region 只读和只浅读
 const obj = {
   foo: {
     bar: 1,
   },
 };
 
-const p = shallowReactive(obj);
+const p = shallowReadonly(obj);
 
 effect(() => {
   console.log(p.foo.bar);
