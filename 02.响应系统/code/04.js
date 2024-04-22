@@ -70,7 +70,7 @@ const trigger = (target, key, type) => {
 
   const effectsToRun = new Set();
   effects &&
-    effectsToRun.forEach((effectFn) => {
+    effects.forEach((effectFn) => {
       if (effectFn !== activeEffect) {
         effectsToRun.add(effectFn);
       }
