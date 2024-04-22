@@ -24,7 +24,7 @@ const cleanup = (effectFn) => {
   effectFn.deps.length = 0;
 };
 
-const effect = (fn, options = {}) => {
+export const effect = (fn, options = {}) => {
   const effectFn = () => {
     cleanup(effectFn);
     activeEffect = effectFn;
@@ -63,19 +63,31 @@ const track = (target, key) => {
   activeEffect.deps.push(deps);
 };
 
-const trigger = (target, key) => {
+const trigger = (target, key, type) => {
   const depsMap = bucket.get(target);
   if (!depsMap) return;
-  const deps = depsMap.get(key);
+  const effects = depsMap.get(key);
 
-  const depsToRun = new Set(deps);
-  depsToRun.forEach((effectFn) => {
-    if (effectFn === activeEffect) {
-      depsToRun.delete(effectFn);
-    }
-  });
+  const effectsToRun = new Set();
+  effects &&
+    effectsToRun.forEach((effectFn) => {
+      if (effectFn !== activeEffect) {
+        effectsToRun.add(effectFn);
+      }
+    });
 
-  depsToRun.forEach((effectFn) => {
+  if (type === TriggerType.ADD || type === TriggerType.DELETE) {
+    const iterateEffects = depsMap.get(ITERATE_KEY);
+
+    iterateEffects &&
+      iterateEffects.forEach((effectFn) => {
+        if (effectFn !== activeEffect) {
+          effectsToRun.add(effectFn);
+        }
+      });
+  }
+
+  effectsToRun.forEach((effectFn) => {
     if (effectFn.options.scheduler) {
       // 如果有调度函数，就调用，让调用者自己实现副作用的逻辑
       effectFn.options.scheduler(effectFn);
@@ -192,6 +204,56 @@ const obj = new Proxy(data, {
   },
 });
 
+const ITERATE_KEY = Symbol();
+
+const TriggerType = {
+  SET: "SET",
+  ADD: "ADD",
+  DELETE: "DELETE",
+};
+
+export const reactive = (obj) => {
+  return new Proxy(obj, {
+    get(target, key, receiver) {
+      track(target, key);
+
+      return Reflect.get(target, key, receiver);
+    },
+    set(target, key, newValue, receiver) {
+      const type = Object.prototype.hasOwnProperty.call(target, key)
+        ? TriggerType.SET
+        : TriggerType.ADD;
+
+      const res = Reflect.set(target, key, newValue, receiver);
+
+      trigger(target, key, type);
+
+      return res;
+    },
+    // 支持 in 操作
+    has(target, key) {
+      track(target, key);
+      return Reflect.has(target, key);
+    },
+    // 支持 for...in 操作
+    ownKeys(target) {
+      track(target, ITERATE_KEY);
+      return Reflect.ownKeys(target);
+    },
+    // 支持 for...in 操作
+    deleteProperty(target, key) {
+      const hasKey = Object.prototype.hasOwnProperty.call(target, key);
+      const res = Reflect.deleteProperty(target, key);
+
+      if (res && hasKey) {
+        trigger(target, key, TriggerType.DELETE);
+      }
+
+      return res;
+    },
+  });
+};
+
 //#region 分支切换与cleanup
 // effect(() => {
 //   document.body.innerHTML = obj.ok ? obj.text : "not";
@@ -257,21 +319,21 @@ const obj = new Proxy(data, {
 //#endregion
 
 //#region watch
-watch(
-  () => obj.foo,
-  (newValue, oldValue, onInvalidate) => {
-    console.log("newValue: ", newValue);
-    console.log("odlValue: ", oldValue);
-    onInvalidate(() => {
-      console.log("onInvalidate");
-    });
-  },
-  {
-    immediate: true,
-    flush: "post",
-  }
-);
+// watch(
+//   () => obj.foo,
+//   (newValue, oldValue, onInvalidate) => {
+//     console.log("newValue: ", newValue);
+//     console.log("odlValue: ", oldValue);
+//     onInvalidate(() => {
+//       console.log("onInvalidate");
+//     });
+//   },
+//   {
+//     immediate: true,
+//     flush: "post",
+//   }
+// );
 
-// obj.foo++;
-console.log("sync");
+// // obj.foo++;
+// console.log("sync");
 //#endregion
