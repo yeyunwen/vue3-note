@@ -215,18 +215,29 @@ const TriggerType = {
 export const reactive = (obj) => {
   return new Proxy(obj, {
     get(target, key, receiver) {
+      if (key === "raw") {
+        return target;
+      }
+
       track(target, key);
 
       return Reflect.get(target, key, receiver);
     },
     set(target, key, newValue, receiver) {
+      const oldValue = target[key];
       const type = Object.prototype.hasOwnProperty.call(target, key)
         ? TriggerType.SET
         : TriggerType.ADD;
 
       const res = Reflect.set(target, key, newValue, receiver);
-
-      trigger(target, key, type);
+      if (target === receiver.raw) {
+        if (
+          oldValue !== newValue &&
+          (oldValue === oldValue || newValue === newValue)
+        ) {
+          trigger(target, key, type);
+        }
+      }
 
       return res;
     },
