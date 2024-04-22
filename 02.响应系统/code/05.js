@@ -1,4 +1,4 @@
-import { reactive, effect } from "./04.js";
+import { reactive, shallowReactive, effect } from "./04.js";
 
 //#region 代理Object
 // const obj = {
@@ -19,6 +19,7 @@ import { reactive, effect } from "./04.js";
 // }, 1000);
 //#endregion
 
+//#region 合理的触发更新，值不变不更新，原型链
 // const reactive = (obj) => {
 //   return new Proxy(obj, {
 //     get(target, key) {
@@ -38,22 +39,41 @@ import { reactive, effect } from "./04.js";
 //   });
 // };
 
-const obj = {};
-const proto = { foo: 1 };
+// const obj = {};
+// const proto = { foo: 1 };
 
-const child = reactive(obj);
-const parent = reactive(proto);
+// const child = reactive(obj);
+// const parent = reactive(proto);
 
-Object.setPrototypeOf(child, parent);
+// Object.setPrototypeOf(child, parent);
 
-effect(() => {
-  console.log(child.foo);
-});
+// effect(() => {
+//   console.log(child.foo);
+// });
 // // console.log(parent.foo);
 
 // console.log(child.raw === obj);
 
-child.foo = 33;
+// child.foo = 33;
 // parent.foo = 34;
 // parent.foo = 36;
 // console.log(child.foo);
+
+//#endregion
+
+//#region 浅响应与深响应
+
+const obj = {
+  foo: {
+    bar: 1,
+  },
+};
+
+const p = shallowReactive(obj);
+
+effect(() => {
+  console.log(p.foo.bar);
+});
+
+p.foo.bar = 2;
+//#endregion

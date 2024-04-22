@@ -212,16 +212,24 @@ const TriggerType = {
   DELETE: "DELETE",
 };
 
-export const reactive = (obj) => {
+export const createReactive = (obj, isShallow = false) => {
   return new Proxy(obj, {
     get(target, key, receiver) {
       if (key === "raw") {
         return target;
       }
 
+      const res = Reflect.get(target, key, receiver);
+
       track(target, key);
 
-      return Reflect.get(target, key, receiver);
+      if (isShallow) {
+        return res;
+      }
+      if (typeof res === "object" && res !== null) {
+        return reactive(res);
+      }
+      return res;
     },
     set(target, key, newValue, receiver) {
       const oldValue = target[key];
@@ -263,6 +271,14 @@ export const reactive = (obj) => {
       return res;
     },
   });
+};
+
+export const reactive = (obj) => {
+  return createReactive(obj);
+};
+
+export const shallowReactive = (obj) => {
+  return createReactive(obj, true);
 };
 
 //#region 分支切换与cleanup
