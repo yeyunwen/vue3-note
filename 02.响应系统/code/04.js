@@ -49,7 +49,7 @@ export const effect = (fn, options = {}) => {
 };
 
 const track = (target, key) => {
-  if (!activeEffect) return;
+  if (!activeEffect || !shouldTrack) return;
   let depsMap = bucket.get(target);
   if (!depsMap) {
     bucket.set(target, (depsMap = new Map()));
@@ -63,7 +63,7 @@ const track = (target, key) => {
   activeEffect.deps.push(deps);
 };
 
-const trigger = (target, key, type) => {
+const trigger = (target, key, type, newValue) => {
   const depsMap = bucket.get(target);
   if (!depsMap) return;
   const effects = depsMap.get(key);
@@ -85,6 +85,27 @@ const trigger = (target, key, type) => {
           effectsToRun.add(effectFn);
         }
       });
+  }
+
+  if (type === TriggerType.ADD && Array.isArray(target)) {
+    const lengthEffects = depsMap.get("length");
+    lengthEffects &&
+      lengthEffects.forEach((effectFn) => {
+        if (effectFn !== activeEffect) {
+          effectsToRun.add(effectFn);
+        }
+      });
+  }
+
+  if (key === "length" && Array.isArray(target)) {
+    depsMap.forEach((effects, key) => {
+      if (key < newValue || key === "length") return;
+      effects.forEach((effectFn) => {
+        if (effectFn !== activeEffect) {
+          effectsToRun.add(effectFn);
+        }
+      });
+    });
   }
 
   effectsToRun.forEach((effectFn) => {
@@ -212,16 +233,67 @@ const TriggerType = {
   DELETE: "DELETE",
 };
 
+/**
+ * 重写数组原型中的某些方法，为了解决调用数组方法时this指向问题
+ * @description 因为在代理对象上调用includes方法时，includes的this指向代理对象，如Reflect.get(target, key, receiver)
+ * @example const obj = {};
+const arr = reactive([obj]);
+console.log(arr.includes(obj)); // false
+ */
+const arrayFindOrginMethods = ["includes", "indexOf", "lastIndexOf"];
+
+/**
+ * 重写数组原型中的某些方法，为了解决调用设置数组的方法时也会触发track，导致溢栈的问题
+ * @description 因为在代理对象上调用includes方法时，includes的this指向代理对象，如Reflect.get(target, key, receiver)
+ * @example effect(() => {
+  arr.push(1);
+});
+effect(() => {
+  arr.push(1);
+});
+ */
+const arraySetOrginMethods = ["push", "pop", "shift", "unshift", "splice"];
+let shouldTrack = true;
+
+const arrayInstrumentations = {};
+
+arrayFindOrginMethods.forEach((method) => {
+  const orginMethod = Array.prototype[method];
+
+  arrayInstrumentations[method] = function (...args) {
+    let res = orginMethod.apply(this, args);
+    if (res === false || res === -1) {
+      res = orginMethod.apply(this.raw, args);
+    }
+    return res;
+  };
+});
+
+arraySetOrginMethods.forEach((method) => {
+  const orginMethod = Array.prototype[method];
+  arrayInstrumentations[method] = function (...args) {
+    shouldTrack = false;
+    const res = orginMethod.apply(this, args);
+    shouldTrack = true;
+    return res;
+  };
+});
+
 export const createReactive = (obj, isShallow = false, isReadonly = false) => {
   return new Proxy(obj, {
     get(target, key, receiver) {
+      console.log("get", key);
       if (key === "raw") {
         return target;
       }
 
+      if (Array.isArray(target) && arrayInstrumentations.hasOwnProperty(key)) {
+        return Reflect.get(arrayInstrumentations, key, receiver);
+      }
+
       const res = Reflect.get(target, key, receiver);
 
-      if (!isReadonly) {
+      if (!isReadonly && typeof key !== "symbol") {
         track(target, key);
       }
 
@@ -240,7 +312,11 @@ export const createReactive = (obj, isShallow = false, isReadonly = false) => {
       }
 
       const oldValue = target[key];
-      const type = Object.prototype.hasOwnProperty.call(target, key)
+      const type = Array.isArray(target)
+        ? Number(key) < target.length
+          ? TriggerType.SET
+          : TriggerType.ADD
+        : Object.prototype.hasOwnProperty.call(target, key)
         ? TriggerType.SET
         : TriggerType.ADD;
 
@@ -250,7 +326,7 @@ export const createReactive = (obj, isShallow = false, isReadonly = false) => {
           oldValue !== newValue &&
           (oldValue === oldValue || newValue === newValue)
         ) {
-          trigger(target, key, type);
+          trigger(target, key, type, newValue);
         }
       }
 
@@ -263,7 +339,7 @@ export const createReactive = (obj, isShallow = false, isReadonly = false) => {
     },
     // 支持 for...in 操作
     ownKeys(target) {
-      track(target, ITERATE_KEY);
+      track(target, Array.isArray(target) ? "length" : ITERATE_KEY);
       return Reflect.ownKeys(target);
     },
     // 支持 for...in 操作
@@ -284,8 +360,26 @@ export const createReactive = (obj, isShallow = false, isReadonly = false) => {
   });
 };
 
+/**
+ * @description 解决多次读取深层响应式对象上非原始值属性时，每次读取都会得到不一样的reactive对象的问题
+ *
+ * @example const obj = {};
+const arr1 = reactive([obj]);
+console.log(arr1.includes(arr1[0])); // false
+ */
+const reactiveMap = new Map();
+
 export const reactive = (obj) => {
-  return createReactive(obj);
+  const existingProxy = reactiveMap.get(obj);
+  if (existingProxy) {
+    return existingProxy;
+  }
+
+  const proxy = createReactive(obj);
+
+  reactiveMap.set(obj, proxy);
+
+  return proxy;
 };
 
 export const shallowReactive = (obj) => {

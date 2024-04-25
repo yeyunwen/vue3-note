@@ -85,17 +85,63 @@ import {
 //#endregion
 
 // #region 只读和只浅读
-const obj = {
-  foo: {
-    bar: 1,
-  },
-};
+// const obj = {
+//   foo: {
+//     bar: 1,
+//   },
+// };
 
-const p = shallowReadonly(obj);
+// const p = shallowReadonly(obj);
+
+// effect(() => {
+//   console.log(p.foo.bar);
+// });
+
+// p.foo.bar = 2;
+//#endregion
+
+//#region 代理数组
+
+const arr = reactive([1, 2, 3]);
+
+// arr[Symbol.iterator] = function () {
+//   const target = this;
+//   let index = 0;
+//   return {
+//     next() {
+//       return {
+//         value: index < target.length ? target[index] : undefined,
+//         done: index++ >= target.length,
+//       };
+//     },
+//   };
+// };
 
 effect(() => {
-  console.log(p.foo.bar);
+  // console.log(arr[0]);
+  // console.log(arr.length);
+  // console.log(arr[2]);
+  // for (const item in arr) {
+  //   console.log(item);
+  // }
+  // for (const value of arr) {
+  //   console.log(value);
+  // }
+  // console.log(arr.includes(3));
 });
 
-p.foo.bar = 2;
-//#endregion
+// arr[0] = 4;
+
+// const obj = {};
+// const arr1 = reactive([obj]);
+// console.log(arr1.indexOf(arr1[0]));
+// console.log(arr1.includes(obj));
+
+effect(() => {
+  arr.push(1);
+});
+effect(() => {
+  arr.push(1);
+});
+
+// #endregion
