@@ -236,21 +236,27 @@ const TriggerType = {
 /**
  * 重写数组原型中的某些方法，为了解决调用数组方法时this指向问题
  * @description 因为在代理对象上调用includes方法时，includes的this指向代理对象，如Reflect.get(target, key, receiver)
- * @example const obj = {};
-const arr = reactive([obj]);
-console.log(arr.includes(obj)); // false
+ * @example
+ * ```js
+ * const obj = {};
+ * const arr = reactive([obj]);
+ * console.log(arr.includes(obj)); // false
+ * ```
  */
 const arrayFindOrginMethods = ["includes", "indexOf", "lastIndexOf"];
 
 /**
  * 重写数组原型中的某些方法，为了解决调用设置数组的方法时也会触发track，导致溢栈的问题
  * @description 因为在代理对象上调用includes方法时，includes的this指向代理对象，如Reflect.get(target, key, receiver)
- * @example effect(() => {
-  arr.push(1);
-});
-effect(() => {
-  arr.push(1);
-});
+ * @example
+ * ```js
+ * effect(() => {
+ *  arr.push(1);
+ * });
+ * effect(() => {
+ *  arr.push(1);
+ *});
+ * ```
  */
 const arraySetOrginMethods = ["push", "pop", "shift", "unshift", "splice"];
 let shouldTrack = true;
@@ -363,9 +369,12 @@ export const createReactive = (obj, isShallow = false, isReadonly = false) => {
 /**
  * @description 解决多次读取深层响应式对象上非原始值属性时，每次读取都会得到不一样的reactive对象的问题
  *
- * @example const obj = {};
-const arr1 = reactive([obj]);
-console.log(arr1.includes(arr1[0])); // false
+ * @example
+ * ```js
+ * const obj = {};
+ * const arr1 = reactive([obj]);
+ * console.log(arr1.includes(arr1[0])); // false
+ * ```
  */
 const reactiveMap = new Map();
 
