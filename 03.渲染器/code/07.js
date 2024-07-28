@@ -1,4 +1,4 @@
-import { normalizeClass } from "../../shared";
+import { isObject, isString, normalizeClass } from "../../shared";
 
 const DOM_API = {
   createElement(tag) {
@@ -21,6 +21,8 @@ const DOM_API = {
     };
 
     if (key === "class") {
+      // 设置class有三种方法 setAttribute、el.className、el.classList
+      // el.className性能最优
       el.className = nextValue || "";
     } else if (shouldSetAsProps(el, key, nextValue)) {
       const type = typeof el[key];
@@ -45,27 +47,42 @@ const createRenderer = (options) => {
     } else {
       // 新节点不存在 && 旧节点存在 指向卸载
       if (container._vnode) {
-        container.innerHTML = "";
+        unmount(container._vnode);
       }
     }
     container._vnode = vnode;
   };
   /**
    *
-   * @param {*} n1 旧节点
-   * @param {*} n2 新节点
+   * @param {VNode} n1 旧节点
+   * @param {VNode} n2 新节点
    * @param {*} container 容器
    */
   const patch = (n1, n2, container) => {
-    // 如果旧节点不存在，就意味着挂载
-    if (!n1) {
-      mountElement(n2, container);
-    } else {
+    // 如果两个vnode类型不同，直接卸载旧节点
+    if (n1 && n1.type !== n2.type) {
+      unmount(n1);
+      n1 = null;
+    }
+    const { type } = n2;
+    switch (type) {
+      case isString(type): {
+        // 如果旧节点不存在，就意味着挂载
+        if (!n1) {
+          mountElement(n2, container);
+        } else {
+          // 更新
+          patchElement(n1, n2);
+        }
+      }
+      case isObject(type): {
+        // 组件
+      }
     }
   };
 
   const mountElement = (vnode, container) => {
-    const el = createElement(vnode.type);
+    const el = (vnode.el = createElement(vnode.type));
 
     // 处理children
     if (typeof vnode.children === "string") {
@@ -84,6 +101,15 @@ const createRenderer = (options) => {
     }
 
     insert(el, container);
+  };
+
+  const patchElement = (n1, n2) => {};
+
+  const unmount = (vnode) => {
+    const parent = vnode.el.parent;
+    if (parent) {
+      parent.removeChild(vnode.el);
+    }
   };
 
   return {
