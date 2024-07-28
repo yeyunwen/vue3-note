@@ -1,4 +1,4 @@
-import { isObject, isString, normalizeClass } from "../../shared";
+import { isArray, isObject, isString, normalizeClass } from "../../shared";
 
 const DOM_API = {
   createElement(tag) {
@@ -20,7 +20,27 @@ const DOM_API = {
       return key in el;
     };
 
-    if (key === "class") {
+    if (/^on/.test(key)) {
+      const invokers = el._vei || (el._vei = {});
+      let invoker = invokers[key];
+      const name = key.slice(2).toLowerCase();
+      if (nextValue) {
+        if (!invoker) {
+          invoker = invokers[key] = (e) => {
+            if (isArray(invoker.value)) {
+              invoker.value.forEach((fn) => fn(e));
+            }
+          };
+          invoker.value = nextValue;
+          el.addEventListener(name, invoker);
+        } else {
+          invoker.value = nextValue;
+        }
+      } else if (invoker) {
+        // 如果新的事件处理函数不存在，但是之前的存在，则清楚之前的绑定
+        el.removeEventListener(name, invoker);
+      }
+    } else if (key === "class") {
       // 设置class有三种方法 setAttribute、el.className、el.classList
       // el.className性能最优
       el.className = nextValue || "";
@@ -134,6 +154,17 @@ const vnode = {
         zsh: false,
       },
     ]),
+    onClick: [
+      (e) => {
+        console.log("click1", e);
+      },
+      (e) => {
+        console.log("click2", e);
+      },
+    ],
+    onMouseenter: (e) => {
+      console.log("Mouseenter", e);
+    },
   },
   children: [
     {
