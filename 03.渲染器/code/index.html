@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import { effect, ref } from "../../dist/reactivity.esm-browser.js";
+      const renderer = (domString, container) => {
+        container.innerHTML = domString;
+      };
+      const root = document.querySelector("#root");
+
+      const count = ref(1);
+      // 渲染器和响应式系统的结合
+      effect(() => {
+        renderer(`<h1>${count.value}</h1>`, root);
+      });
+
+      count.value = 2;
+      import "./07.js";
+    </script>
+  </body>
+</html>
