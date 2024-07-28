@@ -1,3 +1,5 @@
+import { normalizeClass } from "../../shared";
+
 const DOM_API = {
   createElement(tag) {
     console.log(`createElement ${tag}`);
@@ -11,10 +13,30 @@ const DOM_API = {
     console.log(`insert ${child} ${parent} ${anchor}`);
     parent.children = child;
   },
+
+  patchProps(el, key, prevValue, nextValue) {
+    const shouldSetAsProps = (el, key, value) => {
+      if (key === "form" && el.tagName === "INPUT") return false;
+      return key in el;
+    };
+
+    if (key === "class") {
+      el.className = nextValue || "";
+    } else if (shouldSetAsProps(el, key, nextValue)) {
+      const type = typeof el[key];
+      if (type === "boolean" && nextValue === "") {
+        el[key] = true;
+      } else {
+        el[key] = nextValue;
+      }
+    } else {
+      el.setAttribute(key, nextValue);
+    }
+  },
 };
 
 const createRenderer = (options) => {
-  const { createElement, setElementText, insert } = options;
+  const { createElement, setElementText, insert, patchProps } = options;
 
   const hydrate = () => {};
   const render = (vnode, container) => {
@@ -44,9 +66,23 @@ const createRenderer = (options) => {
 
   const mountElement = (vnode, container) => {
     const el = createElement(vnode.type);
+
+    // 处理children
     if (typeof vnode.children === "string") {
       setElementText(el, vnode.children);
+    } else if (Array.isArray(vnode.children)) {
+      vnode.children.forEach((child) => {
+        patch(null, vnode, el);
+      });
     }
+
+    // 处理props
+    if (vnode.props) {
+      for (const key in vnode.props) {
+        patchProps(el, key, null, vnode.props[key]);
+      }
+    }
+
     insert(el, container);
   };
 
@@ -56,10 +92,31 @@ const createRenderer = (options) => {
   };
 };
 
+// const vnode = {
+//   type: "h1",
+//   children: "hello",
+// };
+
 const vnode = {
-  type: "h1",
-  children: "hello",
+  type: "div",
+  props: {
+    id: "foo",
+    class: normalizeClass([
+      "foo bar",
+      {
+        baz: true,
+        zsh: false,
+      },
+    ]),
+  },
+  children: [
+    {
+      type: "p",
+      children: "12323",
+    },
+  ],
 };
+
 const container = { type: "root" };
 
 const renderer = createRenderer(DOM_API);

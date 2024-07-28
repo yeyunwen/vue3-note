@@ -7,8 +7,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <input type="foo" value="121" />
     <script type="module">
       import { effect, ref } from "../../dist/reactivity.esm-browser.js";
+      import "./07.js";
+
       const renderer = (domString, container) => {
         container.innerHTML = domString;
       };
@@ -21,7 +24,6 @@
       });
 
       count.value = 2;
-      import "./07.js";
     </script>
   </body>
 </html>
