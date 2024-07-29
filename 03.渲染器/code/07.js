@@ -6,7 +6,9 @@ import {
 } from "../../shared/index.js";
 import { effect, ref } from "../../dist/reactivity.esm-browser.js";
 
-const DOM_API = {
+/** @typedef {{type: string | object, props: Record<string, any> | null, children: string | any[]| null}}VNode */
+
+export const DOM_API = {
   createElement(tag) {
     console.log(`createElement ${tag}`);
     return document.createElement(tag);
@@ -26,6 +28,13 @@ const DOM_API = {
     parent.insertBefore(child, anchor);
   },
 
+  /**
+   *  更新Props
+   * @param {HTMLElement} el 已挂载的真实DOM
+   * @param {string} key props key
+   * @param {any} prevValue 上一次对应props[key]的值
+   * @param {any} nextValue 新的props[key]的值
+   */
   patchProps(el, key, prevValue, nextValue) {
     const shouldSetAsProps = (el, key, value) => {
       if (key === "form" && el.tagName === "INPUT") return false;
@@ -75,7 +84,12 @@ const DOM_API = {
   },
 };
 
-const createRenderer = (options) => {
+/**
+ *
+ * @param {typeof DOM_API} options
+ * @returns {{render: () => void, hydrate: () => void}}
+ */
+export const createRenderer = (options) => {
   const { createElement, setElementText, insert, patchProps } = options;
 
   const hydrate = () => {};
@@ -89,13 +103,14 @@ const createRenderer = (options) => {
         unmount(container._vnode);
       }
     }
+    // 记录当前节点，在下次render是判断之前是否render
     container._vnode = vnode;
   };
   /**
-   *
-   * @param {VNode} n1 旧节点
+   *  挂载、更新
+   * @param {VNode | null} n1 旧节点 如果为null就走挂载
    * @param {VNode} n2 新节点
-   * @param {*} container 容器
+   * @param {HTMLElement} container 容器
    */
   const patch = (n1, n2, container) => {
     // 如果两个vnode类型不同，直接卸载旧节点
@@ -110,15 +125,19 @@ const createRenderer = (options) => {
       if (!n1) {
         mountElement(n2, container);
       } else {
-        // 更新
-        // patchElement(n1, n2);
-        mountElement(n2, container);
+        // 新旧节点类型相同 更新
+        patchElement(n1, n2);
       }
     } else if (isObject(type)) {
       // 组件
     }
   };
 
+  /**
+   * 挂载节点
+   * @param {VNode} vnode 需要挂载的vnode
+   * @param {HTMLElement} container 挂载容器
+   */
   const mountElement = (vnode, container) => {
     const el = (vnode.el = createElement(vnode.type));
 
@@ -141,7 +160,64 @@ const createRenderer = (options) => {
     insert(el, container);
   };
 
-  const patchElement = (n1, n2) => {};
+  /**
+   * 更新节点
+   * @param {VNode} n1 旧节点
+   * @param {VNode} n2 新节点
+   */
+  const patchElement = (n1, n2) => {
+    // 在patch更新阶段、旧节点肯定会有属性el指向它的真实DOM
+    const el = (n2.el = n1.el);
+    const oldProps = n1.props;
+    const newProps = n2.props;
+    // 更新props
+    for (const key in newProps) {
+      if (newProps[key] !== oldProps[key]) {
+        patchProps(el, key, oldProps[key], newProps[key]);
+      }
+    }
+    for (const key in oldProps) {
+      if (!(key in newProps)) {
+        patchProps(el, key, oldProps[key], null);
+      }
+    }
+
+    // 更新children
+    patchChildren(n1, n2, el);
+  };
+
+  /**
+   *  更新子节点
+   * @param {VNode} n1 旧vnode
+   * @param {VNode} n2 新vnode
+   * @param {HTMLElement} container 原先的真实DOM
+   */
+  const patchChildren = (n1, n2, container) => {
+    // 新子节点是文本
+    if (isString(n2.children)) {
+      if (isArray(n1.children)) {
+        n1.children.forEach((c) => unmount(c));
+      }
+      setElementText(container, n2.children);
+    } else if (isArray(n2.children)) {
+      // 新子节点是数组
+      // 这里是会涉及到patch的核心：diff
+      if (isArray(n1.children)) {
+        n1.children.forEach((c) => unmount(c));
+        n2.children.forEach((c) => patch(null, c, container));
+      } else {
+        setElementText(container, "");
+        n2.children.forEach((c) => patch(null, c, container));
+      }
+    } else {
+      // 新子节点不存在
+      if (isArray(n1.children)) {
+        n1.children.forEach((c) => unmount(c));
+      } else {
+        setElementText(container, "");
+      }
+    }
+  };
 
   const unmount = (vnode) => {
     const parent = vnode.el.parent;
@@ -191,36 +267,3 @@ const createRenderer = (options) => {
 //     },
 //   ],
 // };
-
-const container = { type: "root" };
-console.log("1");
-
-const renderer = createRenderer(DOM_API);
-const bol = ref(false);
-
-effect(() => {
-  const vnode = {
-    type: "div",
-    props: bol.value
-      ? {
-          onClick: () => {
-            alert("父元素clickde");
-          },
-        }
-      : {},
-    children: [
-      {
-        type: "p",
-        props: {
-          onClick: (e) => {
-            bol.value = true;
-            console.log("子元素clickde", e);
-          },
-        },
-        children: "text",
-      },
-    ],
-  };
-  console.log("effect");
-  renderer.render(vnode, document.querySelector("#app"));
-});

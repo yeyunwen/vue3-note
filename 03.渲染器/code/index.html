@@ -9,7 +9,37 @@
     <div id="app"></div>
     <input type="foo" value="121" />
     <script type="module">
-      import "./07.js";
+      import { effect, ref } from "../../dist/reactivity.esm-browser.js";
+      import { DOM_API, createRenderer } from "./07.js";
+      const renderer = createRenderer(DOM_API);
+      const bol = ref(false);
+
+      effect(() => {
+        const vnode = {
+          type: "div",
+          props: bol.value
+            ? {
+                onClick: () => {
+                  alert("父元素clickde");
+                },
+              }
+            : {},
+          children: [
+            {
+              type: "p",
+              props: {
+                onClick: (e) => {
+                  bol.value = true;
+                  console.log("子元素clickde", e);
+                },
+              },
+              children: "text",
+            },
+          ],
+        };
+        console.log("effect");
+        renderer.render(vnode, document.querySelector("#app"));
+      });
     </script>
   </body>
 </html>
