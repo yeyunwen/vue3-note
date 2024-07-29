@@ -296,7 +296,11 @@ export const createRenderer = (options) => {
     let newEndVNode = newChildren[newEndIdx];
 
     while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
-      if (oldStartVNode.key === newStartVNode.key) {
+      if (!oldStartVNode) {
+        oldStartVNode = oldChildren[++oldStartIdx];
+      } else if (!oldEndVNode) {
+        oldEndVNode = oldChildren[--oldEndIdx];
+      } else if (oldStartVNode.key === newStartVNode.key) {
         // 头头
         patch(oldStartVNode, newStartVNode, container);
         ++oldStartIdx;
@@ -318,6 +322,17 @@ export const createRenderer = (options) => {
         insert(oldEndVNode.el, container, oldStartVNode.el);
         oldEndVNode = oldChildren[--oldEndIdx];
         newStartVNode = newChildren[++newStartIdx];
+      } else {
+        const idxInOld = oldChildren.findIndex(
+          (c) => c.key === newStartVNode.key
+        );
+        if (idxInOld > 0) {
+          const vnodeToMove = oldChildren[idxInOld];
+          patch(vnodeToMove, newStartVNode, container);
+          insert(vnodeToMove.el, container, oldStartVNode.el);
+          oldChildren[idxInOld] = undefined;
+          newStartVNode = newChildren[++newStartIdx];
+        }
       }
     }
   };
