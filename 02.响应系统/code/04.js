@@ -206,24 +206,24 @@ const watch = (source, cb, options = {}) => {
   }
 };
 
-const data = {
-  foo: 1,
-  bar: 2,
-};
+// const data = {
+//   foo: 1,
+//   bar: 2,
+// };
 
-const obj = new Proxy(data, {
-  get(target, key) {
-    track(target, key);
+// const obj = new Proxy(data, {
+//   get(target, key) {
+//     track(target, key);
 
-    return target[key];
-  },
-  set(target, key, newValue) {
-    target[key] = newValue;
-    trigger(target, key);
+//     return target[key];
+//   },
+//   set(target, key, newValue) {
+//     target[key] = newValue;
+//     trigger(target, key);
 
-    return true;
-  },
-});
+//     return true;
+//   },
+// });
 
 const ITERATE_KEY = Symbol();
 

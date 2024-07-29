@@ -1,4 +1,10 @@
-import { isArray, isObject, isString, normalizeClass } from "../../shared";
+import {
+  isArray,
+  isObject,
+  isString,
+  normalizeClass,
+} from "../../shared/index.js";
+import { effect, ref } from "../../dist/reactivity.esm-browser.js";
 
 const DOM_API = {
   createElement(tag) {
@@ -9,9 +15,15 @@ const DOM_API = {
     console.log(`setElementText ${text}`);
     container.textContent = text;
   },
+  /**
+   *
+   * @param {HTMLElement} child
+   * @param {HTMLElement} parent
+   * @param {HTMLElement | null} anchor 将要插在这个节点之前，如果null，则在末尾插入
+   */
   insert(child, parent, anchor = null) {
     console.log(`insert ${child} ${parent} ${anchor}`);
-    parent.children = child;
+    parent.insertBefore(child, anchor);
   },
 
   patchProps(el, key, prevValue, nextValue) {
@@ -27,11 +39,17 @@ const DOM_API = {
       if (nextValue) {
         if (!invoker) {
           invoker = invokers[key] = (e) => {
+            // e事件对象的值是触发的时候获得的，invoker的value值是绑定事件的时候通过闭包获得的
+            // 通过对比时间戳，判断事件触发的事件是否早于绑定事件的事件，如果是的话就不触发
+            if (e.timestamp < invoker.attached) return;
             if (isArray(invoker.value)) {
               invoker.value.forEach((fn) => fn(e));
+            } else {
+              invoker.value(e);
             }
           };
           invoker.value = nextValue;
+          invoker.attached = performance.now();
           el.addEventListener(name, invoker);
         } else {
           invoker.value = nextValue;
@@ -63,6 +81,7 @@ const createRenderer = (options) => {
   const hydrate = () => {};
   const render = (vnode, container) => {
     if (vnode) {
+      // 挂载
       patch(container._vnode, vnode, container);
     } else {
       // 新节点不存在 && 旧节点存在 指向卸载
@@ -84,20 +103,19 @@ const createRenderer = (options) => {
       unmount(n1);
       n1 = null;
     }
+    // 到这为止，如果n1 !== null 说明两个vnode类型相同
     const { type } = n2;
-    switch (type) {
-      case isString(type): {
-        // 如果旧节点不存在，就意味着挂载
-        if (!n1) {
-          mountElement(n2, container);
-        } else {
-          // 更新
-          patchElement(n1, n2);
-        }
+    if (isString(type)) {
+      // 如果旧节点不存在，就意味着挂载
+      if (!n1) {
+        mountElement(n2, container);
+      } else {
+        // 更新
+        // patchElement(n1, n2);
+        mountElement(n2, container);
       }
-      case isObject(type): {
-        // 组件
-      }
+    } else if (isObject(type)) {
+      // 组件
     }
   };
 
@@ -109,7 +127,7 @@ const createRenderer = (options) => {
       setElementText(el, vnode.children);
     } else if (Array.isArray(vnode.children)) {
       vnode.children.forEach((child) => {
-        patch(null, vnode, el);
+        patch(null, child, el);
       });
     }
 
@@ -143,38 +161,66 @@ const createRenderer = (options) => {
 //   children: "hello",
 // };
 
-const vnode = {
-  type: "div",
-  props: {
-    id: "foo",
-    class: normalizeClass([
-      "foo bar",
-      {
-        baz: true,
-        zsh: false,
-      },
-    ]),
-    onClick: [
-      (e) => {
-        console.log("click1", e);
-      },
-      (e) => {
-        console.log("click2", e);
-      },
-    ],
-    onMouseenter: (e) => {
-      console.log("Mouseenter", e);
-    },
-  },
-  children: [
-    {
-      type: "p",
-      children: "12323",
-    },
-  ],
-};
+// const vnode = {
+//   type: "div",
+//   props: {
+//     id: "foo",
+//     class: normalizeClass([
+//       "foo bar",
+//       {
+//         baz: true,
+//         zsh: false,
+//       },
+//     ]),
+//     onClick: [
+//       (e) => {
+//         console.log("click1", e);
+//       },
+//       (e) => {
+//         console.log("click2", e);
+//       },
+//     ],
+//     onMouseenter: (e) => {
+//       console.log("Mouseenter", e);
+//     },
+//   },
+//   children: [
+//     {
+//       type: "p",
+//       children: "12323",
+//     },
+//   ],
+// };
 
 const container = { type: "root" };
+console.log("1");
 
 const renderer = createRenderer(DOM_API);
-renderer.render(vnode, container);
+const bol = ref(false);
+
+effect(() => {
+  const vnode = {
+    type: "div",
+    props: bol.value
+      ? {
+          onClick: () => {
+            alert("父元素clickde");
+          },
+        }
+      : {},
+    children: [
+      {
+        type: "p",
+        props: {
+          onClick: (e) => {
+            bol.value = true;
+            console.log("子元素clickde", e);
+          },
+        },
+        children: "text",
+      },
+    ],
+  };
+  console.log("effect");
+  renderer.render(vnode, document.querySelector("#app"));
+});

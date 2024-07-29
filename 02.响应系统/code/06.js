@@ -55,7 +55,7 @@ export const proxyRefs = (target) => {
 
 // const refVal = ref(1);
 
-const obj = reactive({ foo: 1, bar: 2 });
+// const obj = reactive({ foo: 1, bar: 2 });
 
 // const newObj = {
 //   foo: toRef(obj, "foo"),
@@ -66,11 +66,11 @@ const obj = reactive({ foo: 1, bar: 2 });
 //   ...toRefs(obj),
 // };
 
-const newObj = proxyRefs({
-  ...toRefs(obj),
-});
+// const newObj = proxyRefs({
+//   ...toRefs(obj),
+// });
 
-effect(() => {
-  console.log(newObj.foo);
-});
-obj.foo = 2;
+// effect(() => {
+//   console.log(newObj.foo);
+// });
+// obj.foo = 2;
