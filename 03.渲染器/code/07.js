@@ -327,6 +327,14 @@ export const createRenderer = (options) => {
         patch(null, newVNode, container, anchor);
       }
     }
+    // 在新节点更新完成后，遍历旧节点删除不存在的元素
+    for (let i = 1; i < oldChildren.length; i++) {
+      const oldVNode = oldChildren[i];
+      const has = newChildren.find((n) => n.key === oldVNode.key);
+      if (!has) {
+        unmount(oldVNode);
+      }
+    }
   };
 
   /**
