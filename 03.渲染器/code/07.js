@@ -290,49 +290,40 @@ export const createRenderer = (options) => {
     const oldChildren = c1.children;
     /** @type {VNode[]} */
     const newChildren = c2.children;
-    // 用于标记当前最大新节点在旧节点中最大索引
-    let lastIndex = 0;
-    for (let i = 0; i < newChildren.length; i++) {
-      const newVNode = newChildren[i];
-      let j = 0;
-      let find = false;
-      for (j; j < oldChildren.length; j++) {
-        const oldVNode = oldChildren[j];
-        if (newVNode.key === oldVNode.key) {
-          find = true;
-          patch(oldVNode, newVNode, container);
-          // 如果旧节点索引小于当前的lastIndex，则需要移动
-          if (j < lastIndex) {
-            // 先获取newVNode的前一个VNode
-            const prevVNode = newChildren[i - 1];
-            // 如果找不到，说明是第一个节点，则不需要移动
-            if (prevVNode) {
-              const anchor = prevVNode.el.nextSibling;
-              insert(newVNode.el, container, anchor);
-            }
-          } else {
-            lastIndex = j;
-          }
-          break;
-        } else {
-          insert(newVNode.el, container);
-        }
-      }
-      if (!find) {
-        const prevValue = newChildren[i - 1];
-        const anchor = prevValue
-          ? prevValue.el.nextSibling
-          : container.firstChild;
-        // 挂载
-        patch(null, newVNode, container, anchor);
-      }
-    }
-    // 在新节点更新完成后，遍历旧节点删除不存在的元素
-    for (let i = 1; i < oldChildren.length; i++) {
-      const oldVNode = oldChildren[i];
-      const has = newChildren.find((n) => n.key === oldVNode.key);
-      if (!has) {
-        unmount(oldVNode);
+    // 4个指针 分别指向旧节点和新节点的头尾节点
+    let oldStartIdx = 0;
+    let newStartIdx = 0;
+    let oldEndIdx = oldChildren.length - 1;
+    let newEndIdx = newChildren.length - 1;
+    // 旧节点和新节点的头尾节点
+    let oldStartVNode = oldChildren[oldStartIdx];
+    let newStartVNode = newChildren[newStartIdx];
+    let oldEndVNode = oldChildren[oldEndIdx];
+    let newEndVNode = newChildren[newEndIdx];
+
+    while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+      if (oldStartVNode.key === newStartVNode.key) {
+        // 头头
+        patch(oldStartVNode, newStartVNode, container);
+        ++oldStartIdx;
+        ++newStartIdx;
+      } else if (oldEndVNode.key === newEndVNode.key) {
+        // 尾尾
+        patch(oldEndVNode, newEndVNode, container);
+        --oldEndIdx;
+        --newEndIdx;
+      } else if (oldStartVNode.key === newEndVNode.key) {
+        // 头尾
+        patch(oldStartVNode, newEndVNode, container);
+        insert(oldStartVNode.el, container, oldEndVNode.el.nextSibling);
+        oldStartVNode = oldChildren[++oldStartIdx];
+        newEndVNode = newChildren[--newEndIdx];
+      } else if (oldEndVNode.key === newStartVNode.key) {
+        // 尾头
+        patch(oldEndVNode, newStartVNode, container);
+        insert(oldEndVNode.el, container, oldStartVNode.el);
+        oldEndVNode = oldChildren[--oldEndIdx];
+        newStartVNode = newChildren[++newStartIdx];
       }
     }
   };
