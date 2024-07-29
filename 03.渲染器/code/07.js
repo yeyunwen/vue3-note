@@ -1,10 +1,4 @@
-import {
-  isArray,
-  isObject,
-  isString,
-  normalizeClass,
-} from "../../shared/index.js";
-import { effect, ref } from "../../dist/reactivity.esm-browser.js";
+import { isArray, isObject, isString, isNumber } from "../../shared/index.js";
 
 /**
  * @typedef {{
@@ -98,9 +92,9 @@ export const DOM_API = {
   },
 };
 
-const Text = Symbol("text");
-const Comment = Symbol("comment");
-const Fragment = Symbol("fragment");
+export const Text = Symbol("text");
+export const Comment = Symbol("comment");
+export const Fragment = Symbol("fragment");
 
 /**
  *
@@ -199,7 +193,7 @@ export const createRenderer = (options) => {
     const el = (vnode.el = createElement(vnode.type));
 
     // 处理children
-    if (typeof vnode.children === "string") {
+    if (isString(vnode.children) || isNumber(vnode.children)) {
       setElementText(el, vnode.children);
     } else if (Array.isArray(vnode.children)) {
       vnode.children.forEach((child) => {
@@ -252,7 +246,7 @@ export const createRenderer = (options) => {
    */
   const patchChildren = (n1, n2, container) => {
     // 新子节点是文本
-    if (isString(n2.children)) {
+    if (isString(n2.children) || isNumber(n2.children)) {
       if (isArray(n1.children)) {
         n1.children.forEach((c) => unmount(c));
       }
