@@ -14,10 +14,21 @@
       const renderer = createRenderer(DOM_API);
       const bol = ref(false);
 
-      const oldValue = [1, 2, 3, 4];
+      // 理想情况
+      // const oldValue = [1, 2, 3, 4];
       // const newValue = [4, 2, 1, 3];
+
       // 非理想情况
-      const newValue = [2, 4, 1, 3];
+      // const oldValue = [1, 2, 3, 4];
+      // const newValue = [2, 4, 1, 3];
+
+      // 添加节点
+      // const oldValue = [1, 2, 3];
+      // const newValue = [4, 1, 3, 2];
+
+      // 添加节点缺陷情况
+      const oldValue = [1, 2, 3];
+      const newValue = [4, 1, 2, 3];
 
       const oldVNode = {
         type: "div",

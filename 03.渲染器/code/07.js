@@ -331,8 +331,18 @@ export const createRenderer = (options) => {
           patch(vnodeToMove, newStartVNode, container);
           insert(vnodeToMove.el, container, oldStartVNode.el);
           oldChildren[idxInOld] = undefined;
-          newStartVNode = newChildren[++newStartIdx];
+        } else {
+          patch(null, newStartVNode, container, oldStartVNode.el);
         }
+        newStartVNode = newChildren[++newStartIdx];
+      }
+    }
+    if (oldEndIdx < oldStartIdx && newStartIdx <= newEndIdx) {
+      for (let i = newStartIdx; i <= newEndIdx; i++) {
+        const anchor = newChildren[newEndIdx + 1]
+          ? newChildren[newEndIdx + 1].el
+          : null;
+        patch(null, newChildren[i], container, anchor);
       }
     }
   };
