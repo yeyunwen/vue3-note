@@ -136,8 +136,9 @@ export const createRenderer = (options) => {
    * @param {VNode | null} n1 旧节点 如果为null就走挂载
    * @param {VNode} n2 新节点
    * @param {HTMLElement} container 容器
+   * @param {HTMLElement | null} anchor 将要插在这个节点之前，如果null，则在末尾插入
    */
-  const patch = (n1, n2, container) => {
+  const patch = (n1, n2, container, anchor = null) => {
     // 如果两个vnode类型不同，直接卸载旧节点
     if (n1 && n1.type !== n2.type) {
       unmount(n1);
@@ -150,7 +151,7 @@ export const createRenderer = (options) => {
         if (!n1) {
           // 确保vnode 有el属性指向它的真实dom
           const el = (n2.el = createText(n2.children));
-          insert(el, container);
+          insert(el, container, anchor);
         } else {
           // 确保vnode 有el属性指向它的真实dom
           const el = (n2.el = n1.el);
@@ -165,7 +166,7 @@ export const createRenderer = (options) => {
       }
       case Fragment: {
         if (!n1) {
-          n2.children.forEach((c) => patch(null, c, container));
+          n2.children.forEach((c) => patch(null, c, container, anchor));
         } else {
           patchChildren(n1, n2, container);
         }
@@ -175,7 +176,7 @@ export const createRenderer = (options) => {
         if (isString(type)) {
           // 如果旧节点不存在，就意味着挂载
           if (!n1) {
-            mountElement(n2, container);
+            mountElement(n2, container, anchor);
           } else {
             // 新旧节点类型相同 更新
             patchElement(n1, n2);
@@ -191,8 +192,9 @@ export const createRenderer = (options) => {
    * 挂载节点
    * @param {VNode} vnode 需要挂载的vnode
    * @param {HTMLElement} container 挂载容器
+   * @param {HTMLElement | null} anchor 将要插入的位置
    */
-  const mountElement = (vnode, container) => {
+  const mountElement = (vnode, container, anchor = null) => {
     // 确保vnode 有el属性指向它的真实dom
     const el = (vnode.el = createElement(vnode.type));
 
@@ -201,7 +203,7 @@ export const createRenderer = (options) => {
       setElementText(el, vnode.children);
     } else if (Array.isArray(vnode.children)) {
       vnode.children.forEach((child) => {
-        patch(null, child, el);
+        patch(null, child, el, anchor);
       });
     }
 
@@ -212,7 +214,7 @@ export const createRenderer = (options) => {
       }
     }
 
-    insert(el, container);
+    insert(el, container, anchor);
   };
 
   /**
@@ -293,9 +295,11 @@ export const createRenderer = (options) => {
     for (let i = 0; i < newChildren.length; i++) {
       const newVNode = newChildren[i];
       let j = 0;
+      let find = false;
       for (j; j < oldChildren.length; j++) {
         const oldVNode = oldChildren[j];
         if (newVNode.key === oldVNode.key) {
+          find = true;
           patch(oldVNode, newVNode, container);
           // 如果旧节点索引小于当前的lastIndex，则需要移动
           if (j < lastIndex) {
@@ -313,6 +317,14 @@ export const createRenderer = (options) => {
         } else {
           insert(newVNode.el, container);
         }
+      }
+      if (!find) {
+        const prevValue = newChildren[i - 1];
+        const anchor = prevValue
+          ? prevValue.el.nextSibling
+          : container.firstChild;
+        // 挂载
+        patch(null, newVNode, container, anchor);
       }
     }
   };
