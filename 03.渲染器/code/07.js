@@ -6,7 +6,7 @@ import {
 } from "../../shared/index.js";
 import { effect, ref } from "../../dist/reactivity.esm-browser.js";
 
-/** @typedef {{type: string | object, props: Record<string, any> | null, children: string | any[]| null}}VNode */
+/** @typedef {{type: string | object, props: Record<string, any> | null, children: string | any[]| null, el: HTMLElement}}VNode */
 
 export const DOM_API = {
   createElement(tag) {
@@ -16,6 +16,12 @@ export const DOM_API = {
   setElementText(container, text) {
     console.log(`setElementText ${text}`);
     container.textContent = text;
+  },
+  createText(text) {
+    return document.createTextNode(text);
+  },
+  setText(el, text) {
+    el.nodeValue = text;
   },
   /**
    *
@@ -84,13 +90,23 @@ export const DOM_API = {
   },
 };
 
+const Text = Symbol("text");
+const Comment = Symbol("comment");
+
 /**
  *
  * @param {typeof DOM_API} options
  * @returns {{render: () => void, hydrate: () => void}}
  */
 export const createRenderer = (options) => {
-  const { createElement, setElementText, insert, patchProps } = options;
+  const {
+    createElement,
+    setElementText,
+    insert,
+    patchProps,
+    createText,
+    setText,
+  } = options;
 
   const hydrate = () => {};
   const render = (vnode, container) => {
@@ -120,16 +136,35 @@ export const createRenderer = (options) => {
     }
     // 到这为止，如果n1 !== null 说明两个vnode类型相同
     const { type } = n2;
-    if (isString(type)) {
-      // 如果旧节点不存在，就意味着挂载
-      if (!n1) {
-        mountElement(n2, container);
-      } else {
-        // 新旧节点类型相同 更新
-        patchElement(n1, n2);
+    switch (type) {
+      case Text: {
+        if (!n1) {
+          // 确保vnode 有el属性指向它的真实dom
+          const el = (n2.el = createText(n2.children));
+          insert(el, container);
+        } else {
+          // 确保vnode 有el属性指向它的真实dom
+          const el = (n2.el = n1.el);
+          if (n2.children !== n1.children) {
+            setText(el, n2.children);
+          }
+        }
       }
-    } else if (isObject(type)) {
-      // 组件
+      case Comment: {
+      }
+      default: {
+        if (isString(type)) {
+          // 如果旧节点不存在，就意味着挂载
+          if (!n1) {
+            mountElement(n2, container);
+          } else {
+            // 新旧节点类型相同 更新
+            patchElement(n1, n2);
+          }
+        } else if (isObject(type)) {
+          // 组件
+        }
+      }
     }
   };
 
@@ -139,6 +174,7 @@ export const createRenderer = (options) => {
    * @param {HTMLElement} container 挂载容器
    */
   const mountElement = (vnode, container) => {
+    // 确保vnode 有el属性指向它的真实dom
     const el = (vnode.el = createElement(vnode.type));
 
     // 处理children
@@ -166,6 +202,7 @@ export const createRenderer = (options) => {
    * @param {VNode} n2 新节点
    */
   const patchElement = (n1, n2) => {
+    // 确保vnode 有el属性指向它的真实dom
     // 在patch更新阶段、旧节点肯定会有属性el指向它的真实DOM
     const el = (n2.el = n1.el);
     const oldProps = n1.props;
