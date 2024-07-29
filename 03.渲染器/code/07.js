@@ -92,6 +92,7 @@ export const DOM_API = {
 
 const Text = Symbol("text");
 const Comment = Symbol("comment");
+const Fragment = Symbol("fragment");
 
 /**
  *
@@ -151,6 +152,13 @@ export const createRenderer = (options) => {
         }
       }
       case Comment: {
+      }
+      case Fragment: {
+        if (!n1) {
+          n2.children.forEach((c) => patch(null, c, container));
+        } else {
+          patchChildren(n1, n2, container);
+        }
       }
       default: {
         if (isString(type)) {
@@ -256,7 +264,16 @@ export const createRenderer = (options) => {
     }
   };
 
+  /**
+   *
+   * @param {VNode} vnode
+   * @returns
+   */
   const unmount = (vnode) => {
+    if (vnode.type === Fragment) {
+      vnode.children.forEach((c) => unmount(e));
+      return;
+    }
     const parent = vnode.el.parent;
     if (parent) {
       parent.removeChild(vnode.el);
