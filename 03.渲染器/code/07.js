@@ -303,13 +303,13 @@ export const createRenderer = (options) => {
       } else if (oldStartVNode.key === newStartVNode.key) {
         // 头头
         patch(oldStartVNode, newStartVNode, container);
-        ++oldStartIdx;
-        ++newStartIdx;
+        oldStartVNode = oldChildren[++oldStartIdx];
+        newStartVNode = newChildren[++newStartIdx];
       } else if (oldEndVNode.key === newEndVNode.key) {
         // 尾尾
         patch(oldEndVNode, newEndVNode, container);
-        --oldEndIdx;
-        --newEndIdx;
+        oldEndVNode = oldChildren[--oldEndIdx];
+        newEndVNode = newChildren[--newEndIdx];
       } else if (oldStartVNode.key === newEndVNode.key) {
         // 头尾
         patch(oldStartVNode, newEndVNode, container);
