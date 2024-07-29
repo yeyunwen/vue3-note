@@ -6,7 +6,15 @@ import {
 } from "../../shared/index.js";
 import { effect, ref } from "../../dist/reactivity.esm-browser.js";
 
-/** @typedef {{type: string | object, props: Record<string, any> | null, children: string | any[]| null, el: HTMLElement}}VNode */
+/**
+ * @typedef {{
+ * type: string | object,
+ * props: Record<string, any> | null,
+ * children: string | VNode[]| null,
+ * el: HTMLElement,
+ * key: string | number | null
+ * }} VNode
+ * */
 
 export const DOM_API = {
   createElement(tag) {
@@ -150,8 +158,10 @@ export const createRenderer = (options) => {
             setText(el, n2.children);
           }
         }
+        break;
       }
       case Comment: {
+        break;
       }
       case Fragment: {
         if (!n1) {
@@ -159,6 +169,7 @@ export const createRenderer = (options) => {
         } else {
           patchChildren(n1, n2, container);
         }
+        break;
       }
       default: {
         if (isString(type)) {
@@ -248,23 +259,10 @@ export const createRenderer = (options) => {
       // 新子节点是数组
       // 这里是会涉及到patch的核心：diff
       if (isArray(n1.children)) {
-        const oldChildren = n1.children;
-        const newChildren = n2.children;
-        const oldLen = oldChildren.length;
-        const newLen = newChildren.length;
-        const commonLen = Math.min([oldLen, newLen]);
-        for (let i = 0; i < commonLen; i++) {
-          patch(oldChildren[i], newChildren[i], container);
-        }
-        if (newLen > oldLen) {
-          for (let i = commonLen; i < newLen; i++) {
-            patch(null, newChildren[i], container);
-          }
-        } else {
-          for (let i = commonLen; i < oldLen; i++) {
-            unmount(oldChildren[i]);
-          }
-        }
+        // 有key的情况
+        patchKeyedChildren(n1, n2, container);
+        // 没有Key的情况
+        // patchUnKeyedChildren(n1, n2, container);
       } else {
         setElementText(container, "");
         n2.children.forEach((c) => patch(null, c, container));
@@ -281,12 +279,72 @@ export const createRenderer = (options) => {
 
   /**
    *
+   * @param {VNode} c1
+   * @param {VNode} c2
+   * @param {HTMLElement} container
+   */
+  const patchKeyedChildren = (c1, c2, container) => {
+    /** @type {VNode[]} */
+    const oldChildren = c1.children;
+    /** @type {VNode[]} */
+    const newChildren = c2.children;
+    // 用于标记当前最大新节点在旧节点中最大索引
+    let lastIndex = 0;
+    for (let i = 0; i < newChildren.length; i++) {
+      const newVNode = newChildren[i];
+      let j = 0;
+      for (j; j < oldChildren.length; j++) {
+        const oldVNode = oldChildren[j];
+        if (newVNode.key === oldVNode.key) {
+          patch(oldVNode, newVNode, container);
+          // 如果旧节点索引小于当前的lastIndex，则需要移动
+          if (j < lastIndex) {
+            // 先获取newVNode的前一个VNode
+          } else {
+            lastIndex = j;
+          }
+          break;
+        } else {
+          insert(newVNode.el, container);
+        }
+      }
+    }
+  };
+
+  /**
+   *
+   * @param {VNode} c1
+   * @param {VNode} c2
+   * @param {HTMLElement} container
+   */
+  const patchUnKeyedChildren = (c1, c2, container) => {
+    const oldChildren = c1.children;
+    const newChildren = c2.children;
+    const oldLen = oldChildren.length;
+    const newLen = newChildren.length;
+    const commonLen = Math.min(oldLen, newLen);
+    for (let i = 0; i < commonLen; i++) {
+      patch(oldChildren[i], newChildren[i], container);
+    }
+    if (newLen > oldLen) {
+      for (let i = commonLen; i < newLen; i++) {
+        patch(null, newChildren[i], container);
+      }
+    } else {
+      for (let i = commonLen; i < oldLen; i++) {
+        unmount(oldChildren[i]);
+      }
+    }
+  };
+
+  /**
+   *
    * @param {VNode} vnode
    * @returns
    */
   const unmount = (vnode) => {
     if (vnode.type === Fragment) {
-      vnode.children.forEach((c) => unmount(e));
+      vnode.children.forEach((c) => unmount(c));
       return;
     }
     const parent = vnode.el.parent;
