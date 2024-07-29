@@ -344,6 +344,10 @@ export const createRenderer = (options) => {
           : null;
         patch(null, newChildren[i], container, anchor);
       }
+    } else if (newEndIdx < newStartIdx && oldStartIdx <= oldEndIdx) {
+      for (let i = oldStartIdx; i <= oldEndIdx; i++) {
+        unmount(oldChildren[i]);
+      }
     }
   };
 
@@ -383,7 +387,7 @@ export const createRenderer = (options) => {
       vnode.children.forEach((c) => unmount(c));
       return;
     }
-    const parent = vnode.el.parent;
+    const parent = vnode.el.parentNode;
     if (parent) {
       parent.removeChild(vnode.el);
     }
