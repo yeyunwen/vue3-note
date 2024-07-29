@@ -300,6 +300,12 @@ export const createRenderer = (options) => {
           // 如果旧节点索引小于当前的lastIndex，则需要移动
           if (j < lastIndex) {
             // 先获取newVNode的前一个VNode
+            const prevVNode = newChildren[i - 1];
+            // 如果找不到，说明是第一个节点，则不需要移动
+            if (prevVNode) {
+              const anchor = prevVNode.el.nextSibling;
+              insert(newVNode.el, container, anchor);
+            }
           } else {
             lastIndex = j;
           }
