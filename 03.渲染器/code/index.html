@@ -14,6 +14,7 @@
       const renderer = createRenderer(DOM_API);
       const bol = ref(false);
 
+      // ==========双端diff============
       // 理想情况
       // const oldValue = [1, 2, 3, 4];
       // const newValue = [4, 2, 1, 3];
@@ -31,8 +32,18 @@
       // const newValue = [4, 1, 2, 3];
 
       // 移除不存在的节点
-      const oldValue = [1, 2, 3];
-      const newValue = [1, 3];
+      // const oldValue = [1, 2, 3];
+      // const newValue = [1, 3];
+
+      // ==========快速diff============
+
+      // 添加节点
+      // const oldValue = [1, 2, 3];
+      // const newValue = [1, 4, 5, 2, 3];
+
+      // 卸载节点
+      const oldValue = [1, 4, 5, 2, 3];
+      const newValue = [1, 2, 3];
 
       const oldVNode = {
         type: "div",

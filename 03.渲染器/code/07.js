@@ -284,69 +284,43 @@ export const createRenderer = (options) => {
     const oldChildren = c1.children;
     /** @type {VNode[]} */
     const newChildren = c2.children;
-    // 4个指针 分别指向旧节点和新节点的头尾节点
-    let oldStartIdx = 0;
-    let newStartIdx = 0;
-    let oldEndIdx = oldChildren.length - 1;
-    let newEndIdx = newChildren.length - 1;
-    // 旧节点和新节点的头尾节点
-    let oldStartVNode = oldChildren[oldStartIdx];
-    let newStartVNode = newChildren[newStartIdx];
-    let oldEndVNode = oldChildren[oldEndIdx];
-    let newEndVNode = newChildren[newEndIdx];
+    // 更新相同的前置节点
+    let j = 0;
+    let oldVNode = oldChildren[j];
+    let newVNode = newChildren[j];
+    while (oldVNode.key === newVNode.key) {
+      patch(oldVNode, newVNode, container);
+      j++;
+      oldVNode = oldChildren[j];
+      newVNode = newChildren[j];
+    }
+    // 更新相同的后置节点
+    let oldEnd = oldChildren.length - 1;
+    let newEnd = newChildren.length - 1;
+    oldVNode = oldChildren[oldEnd];
+    newVNode = newChildren[newEnd];
+    while (oldVNode.key === newVNode.key) {
+      patch(oldVNode, newVNode, container);
+      oldEnd--;
+      newEnd--;
+      oldVNode = oldChildren[oldEnd];
+      newVNode = newChildren[newEnd];
+    }
 
-    while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
-      if (!oldStartVNode) {
-        oldStartVNode = oldChildren[++oldStartIdx];
-      } else if (!oldEndVNode) {
-        oldEndVNode = oldChildren[--oldEndIdx];
-      } else if (oldStartVNode.key === newStartVNode.key) {
-        // 头头
-        patch(oldStartVNode, newStartVNode, container);
-        oldStartVNode = oldChildren[++oldStartIdx];
-        newStartVNode = newChildren[++newStartIdx];
-      } else if (oldEndVNode.key === newEndVNode.key) {
-        // 尾尾
-        patch(oldEndVNode, newEndVNode, container);
-        oldEndVNode = oldChildren[--oldEndIdx];
-        newEndVNode = newChildren[--newEndIdx];
-      } else if (oldStartVNode.key === newEndVNode.key) {
-        // 头尾
-        patch(oldStartVNode, newEndVNode, container);
-        insert(oldStartVNode.el, container, oldEndVNode.el.nextSibling);
-        oldStartVNode = oldChildren[++oldStartIdx];
-        newEndVNode = newChildren[--newEndIdx];
-      } else if (oldEndVNode.key === newStartVNode.key) {
-        // 尾头
-        patch(oldEndVNode, newStartVNode, container);
-        insert(oldEndVNode.el, container, oldStartVNode.el);
-        oldEndVNode = oldChildren[--oldEndIdx];
-        newStartVNode = newChildren[++newStartIdx];
-      } else {
-        const idxInOld = oldChildren.findIndex(
-          (c) => c.key === newStartVNode.key
-        );
-        if (idxInOld > 0) {
-          const vnodeToMove = oldChildren[idxInOld];
-          patch(vnodeToMove, newStartVNode, container);
-          insert(vnodeToMove.el, container, oldStartVNode.el);
-          oldChildren[idxInOld] = undefined;
-        } else {
-          patch(null, newStartVNode, container, oldStartVNode.el);
-        }
-        newStartVNode = newChildren[++newStartIdx];
+    // 新增节点
+    if (j > oldEnd && j <= newEnd) {
+      const anchorIndex = newEnd + 1;
+      const anchor =
+        anchorIndex < newChildren.length ? newChildren[anchorIndex].el : null;
+      while (j <= newEnd) {
+        patch(null, newChildren[j++], container, anchor);
       }
     }
-    if (oldEndIdx < oldStartIdx && newStartIdx <= newEndIdx) {
-      for (let i = newStartIdx; i <= newEndIdx; i++) {
-        const anchor = newChildren[newEndIdx + 1]
-          ? newChildren[newEndIdx + 1].el
-          : null;
-        patch(null, newChildren[i], container, anchor);
-      }
-    } else if (newEndIdx < newStartIdx && oldStartIdx <= oldEndIdx) {
-      for (let i = oldStartIdx; i <= oldEndIdx; i++) {
-        unmount(oldChildren[i]);
+
+    // 卸载节点
+    if (j > newEnd && j <= oldEnd) {
+      while (j <= oldEnd) {
+        unmount(oldChildren[j++]);
       }
     }
   };
