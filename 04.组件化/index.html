@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import {
+        createRenderer,
+        DOM_API,
+      } from "../packages/runtime-core/src/index.js";
+
+      const renderer = createRenderer(DOM_API);
+
+      const MyComponent = {
+        name: "MyComponent",
+        render() {
+          return {
+            type: "div",
+            children: "hello",
+          };
+        },
+      };
+      const CompVNode = {
+        type: MyComponent,
+      };
+
+      renderer.render(CompVNode, document.querySelector("#app"));
+    </script>
+  </body>
+</html>
