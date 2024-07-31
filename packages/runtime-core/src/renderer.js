@@ -1,9 +1,11 @@
+// @ts-check
 import {
   isArray,
   isObject,
   isString,
   isNumber,
-} from "../../packages/shared/index.js";
+} from "../../shared/src/general.js";
+import { Text, Comment, Fragment } from "./vnode.js";
 
 /**
  * @typedef {{
@@ -96,10 +98,6 @@ export const DOM_API = {
     }
   },
 };
-
-export const Text = Symbol("text");
-export const Comment = Symbol("comment");
-export const Fragment = Symbol("fragment");
 
 const getSequence = (arr) => {
   const p = arr.slice();
@@ -223,6 +221,11 @@ export const createRenderer = (options) => {
           }
         } else if (isObject(type)) {
           // 组件
+          if (!n1) {
+            mountComponet(n2, container, anchor);
+          } else {
+            patchComponet(n1, n2, anchor);
+          }
         }
       }
     }
@@ -485,6 +488,20 @@ export const createRenderer = (options) => {
       }
     }
   };
+
+  /**
+   * @param {VNode} vnode
+   * @param {HTMLElement} container
+   * @param {HTMLElement} anchor
+   */
+  const mountComponet = (vnode, container, anchor) => {
+    const componentOptions = vnode.type;
+    const { render } = componentOptions;
+    const subTree = render();
+    patch(null, subTree, container, anchor);
+  };
+
+  const patchComponet = (n1, n2, anchor) => {};
 
   /**
    *
