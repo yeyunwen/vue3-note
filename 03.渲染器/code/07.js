@@ -96,6 +96,47 @@ export const Text = Symbol("text");
 export const Comment = Symbol("comment");
 export const Fragment = Symbol("fragment");
 
+const getSequence = (arr) => {
+  const p = arr.slice();
+  const result = [0];
+  let i, j, u, v, c;
+  const len = arr.length;
+  for (i = 0; i < len; i++) {
+    const arrI = arr[i];
+    if (arrI !== 0) {
+      j = result[result.length - 1];
+      if (arr[j] < arrI) {
+        p[i] = j;
+        result.push(i);
+        continue;
+      }
+      u = 0;
+      v = result.length - 1;
+      while (u < v) {
+        c = (u + v) >> 1;
+        if (arr[result[c]] < arrI) {
+          u = c + 1;
+        } else {
+          v = c;
+        }
+      }
+      if (arrI < arr[result[u]]) {
+        if (u > 0) {
+          p[i] = result[u - 1];
+        }
+        result[u] = i;
+      }
+    }
+  }
+  u = result.length;
+  v = result[u - 1];
+  while (u-- > 0) {
+    result[u] = v;
+    v = p[v];
+  }
+  return result;
+};
+
 /**
  *
  * @param {typeof DOM_API} options
@@ -284,7 +325,8 @@ export const createRenderer = (options) => {
     const oldChildren = c1.children;
     /** @type {VNode[]} */
     const newChildren = c2.children;
-    // 更新相同的前置节点
+
+    // 1.更新相同的前置节点
     let j = 0;
     let oldVNode = oldChildren[j];
     let newVNode = newChildren[j];
@@ -294,7 +336,8 @@ export const createRenderer = (options) => {
       oldVNode = oldChildren[j];
       newVNode = newChildren[j];
     }
-    // 更新相同的后置节点
+
+    // 2.更新相同的后置节点
     let oldEnd = oldChildren.length - 1;
     let newEnd = newChildren.length - 1;
     oldVNode = oldChildren[oldEnd];
@@ -307,7 +350,7 @@ export const createRenderer = (options) => {
       newVNode = newChildren[newEnd];
     }
 
-    // 新增节点
+    // 3.新增节点
     if (j > oldEnd && j <= newEnd) {
       const anchorIndex = newEnd + 1;
       const anchor =
@@ -317,10 +360,97 @@ export const createRenderer = (options) => {
       }
     }
 
-    // 卸载节点
-    if (j > newEnd && j <= oldEnd) {
+    // 4.卸载节点
+    else if (j > newEnd && j <= oldEnd) {
       while (j <= oldEnd) {
         unmount(oldChildren[j++]);
+      }
+    }
+
+    // 5.未知序列
+    else {
+      // 需要移动节点
+      // 新的一组节点中未处理的子节点数量
+      const toBePatched = newEnd - j + 1;
+      // 新节点在老节点中的索引表
+      const newIndexToOldIndexMap = new Array(toBePatched).fill(-1);
+
+      const oldStart = j;
+      const newStart = j;
+      // 标记是否有节点需要移动
+      let moved = false;
+      let maxNewIndexSoFar = 0;
+
+      // 构建新节点 key 和 index 索引表
+      const keyIndex = {};
+      for (let i = newStart; i <= newEnd; i++) {
+        keyIndex[newChildren[i].key] = i;
+      }
+
+      let patched = 0;
+      // 遍历老节点中未处理节点，填充 source
+      for (let i = oldStart; i <= oldEnd; i++) {
+        oldVNode = oldChildren[i];
+        if (patched <= toBePatched) {
+          const newIndex = keyIndex[oldVNode.key];
+          // 老节点在新节点中先打个 patch
+          if (newIndex !== undefined) {
+            newVNode = newChildren[newIndex];
+            patch(oldVNode, newVNode, container);
+            patched++;
+            newIndexToOldIndexMap[newIndex - newStart] = i;
+            if (newIndex < maxNewIndexSoFar) {
+              moved = true;
+            } else {
+              maxNewIndexSoFar = newIndex;
+            }
+          }
+          // 老节点不在心节点中，直接卸载
+          else {
+            unmount(oldVNode);
+          }
+        }
+        // 新节点全部更新，老节点中还有内容，直接卸载
+        else {
+          unmount(oldVNode);
+        }
+      }
+
+      // 如果需要移动 则需要找到最长递增子序列来减少移动次数
+      if (moved) {
+        const seq = getSequence(newIndexToOldIndexMap);
+        // s 指向最长递增子序列的最后一个元素
+        let s = seq.length - 1;
+        // i 指向新的一组子节点的最后一个元素
+        let i = toBePatched - 1;
+        for (i; i >= 0; i--) {
+          // 如果当前最长递增子序列的最后一个元素不在旧节点中，说明需要新增节点
+          if (newIndexToOldIndexMap[i] === -1) {
+            // 添加新节点
+            const pos = i + newStart;
+            const newVNode = newChildren[pos];
+            const nextPos = pos + 1;
+            const anchor =
+              nextPos < newChildren.length ? newChildren[nextPos].el : null;
+            patch(null, newVNode, container, anchor);
+          }
+          // 如果节点的索引不等于 seq[s] 的值，说明需要移动节点
+          else if (i !== seq[s]) {
+            const pos = i + newStart;
+            const newVNode = newChildren[pos];
+            // 该节点的下一个节点的位置索引
+            const nextPos = pos + 1;
+            // 锚点
+            const anchor =
+              nextPos < newChildren.length ? newChildren[nextPos].el : null;
+            // 移动
+            insert(newVNode.el, container, anchor);
+          }
+          // 不需要移动
+          else {
+            s--;
+          }
+        }
       }
     }
   };
@@ -372,39 +502,3 @@ export const createRenderer = (options) => {
     hydrate,
   };
 };
-
-// const vnode = {
-//   type: "h1",
-//   children: "hello",
-// };
-
-// const vnode = {
-//   type: "div",
-//   props: {
-//     id: "foo",
-//     class: normalizeClass([
-//       "foo bar",
-//       {
-//         baz: true,
-//         zsh: false,
-//       },
-//     ]),
-//     onClick: [
-//       (e) => {
-//         console.log("click1", e);
-//       },
-//       (e) => {
-//         console.log("click2", e);
-//       },
-//     ],
-//     onMouseenter: (e) => {
-//       console.log("Mouseenter", e);
-//     },
-//   },
-//   children: [
-//     {
-//       type: "p",
-//       children: "12323",
-//     },
-//   ],
-// };
