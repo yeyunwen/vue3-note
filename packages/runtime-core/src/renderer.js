@@ -4,12 +4,14 @@ import {
   isObject,
   isString,
   isNumber,
+  isFunction,
 } from "../../shared/src/general.js";
 import { Text, Comment, Fragment } from "./vnode.js";
 import {
   effect,
   reactive,
   shallowReactive,
+  shallowReadonly,
 } from "../../../packages/reactivity/src/effect.js";
 import { queueJob } from "./scheduler.js";
 
@@ -18,7 +20,7 @@ import { queueJob } from "./scheduler.js";
  * state: any,
  * isMounted: boolean,
  * subtree: VNode | null,
- * props: Record<string | symbol, any>
+ * props: Record<string | symbol, any>,
  * }} Instance
  *
  * @typedef {{
@@ -27,7 +29,8 @@ import { queueJob } from "./scheduler.js";
  * children: string | VNode[]| null,
  * el: HTMLElement,
  * key: string | number | null,
- * component: Instance
+ * component: Instance,
+ * setup: () => Function | Record<any, any>
  * }} VNode
  * */
 
@@ -511,9 +514,9 @@ export const createRenderer = (options) => {
   const mountComponet = (vnode, container, anchor) => {
     const componentOptions = vnode.type;
     const {
-      render,
       data,
       props: propsOptions,
+      setup,
       beforeCreate,
       created,
       beforeMount,
@@ -521,6 +524,7 @@ export const createRenderer = (options) => {
       beforeUpdate,
       updated,
     } = componentOptions;
+    let render = componentOptions.render;
 
     beforeCreate && beforeCreate();
     const state = reactive(data());
@@ -533,6 +537,14 @@ export const createRenderer = (options) => {
       isMounted: false,
       subtree: null,
     };
+    const setupContext = { attrs };
+    const setupResult = setup(shallowReadonly(instance.props), setupContext);
+    let setupState = null;
+    if (isFunction(setupResult)) {
+      render = setupResult;
+    } else {
+      setupState = setupResult;
+    }
     vnode.component = instance;
     const renderContext = new Proxy(instance, {
       get(target, key, receiver) {
@@ -541,6 +553,8 @@ export const createRenderer = (options) => {
           return state[key];
         } else if (props && key in props) {
           return props[key];
+        } else if (setupState && key in setupState) {
+          return setupState[key];
         } else {
           console.error("不存在");
         }
@@ -551,6 +565,8 @@ export const createRenderer = (options) => {
           return (state[key] = newValue);
         } else if (props && key in props) {
           return (props[key] = newValue);
+        } else if (setupState && key in setupState) {
+          return (setupState[key] = newValue);
         } else {
           console.error("不存在");
         }
