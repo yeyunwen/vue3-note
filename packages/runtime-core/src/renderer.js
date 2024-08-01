@@ -527,7 +527,7 @@ export const createRenderer = (options) => {
     let render = componentOptions.render;
 
     beforeCreate && beforeCreate();
-    const state = reactive(data());
+    const state = data ? reactive(data()) : null;
     const [props, attrs] = resolveProps(propsOptions, vnode.props);
 
     /**@type {Instance} */
@@ -537,7 +537,20 @@ export const createRenderer = (options) => {
       isMounted: false,
       subtree: null,
     };
-    const setupContext = { attrs };
+    /**
+     *
+     * @param {string} event
+     * @param  {...any} playload
+     */
+    const emit = (event, ...playload) => {
+      const eventName = `on${event[0].toUpperCase() + event.slice(1)}`;
+      const handler = props[eventName];
+      if (handler) {
+        handler(...playload);
+      }
+    };
+
+    const setupContext = { attrs, emit };
     const setupResult = setup(shallowReadonly(instance.props), setupContext);
     let setupState = null;
     if (isFunction(setupResult)) {
@@ -586,7 +599,7 @@ export const createRenderer = (options) => {
 
     effect(
       () => {
-        const subTree = render.call(state, state);
+        const subTree = render.call(renderContext, state);
         if (!instance.isMounted) {
           beforeMount && beforeMount.call(state);
           patch(null, subTree, container, anchor);
@@ -605,14 +618,35 @@ export const createRenderer = (options) => {
     );
   };
 
+  /**
+   *
+   * @param {VNode} n1
+   * @param {VNode} n2
+   * @param {HTMLElement} anchor
+   */
+  const patchComponet = (n1, n2, anchor) => {
+    const instance = (n2.component = n1.component);
+    const { props } = instance;
+    if (hasPropsChanged(n1.props, n2.props)) {
+      const [nextProps] = resolveProps(n2.type.props, n2.props);
+      // 更新 props
+      for (const k in nextProps) {
+        props[k] = nextProps[k];
+      }
+      // 删除不存在的 props
+      for (const k in props) {
+        if (!(k in nextProps)) delete props[k];
+      }
+    }
+  };
   const resolveProps = (compProps, vnodeProps) => {
     const props = {};
     const attrs = {};
-    for (const key in compProps) {
-      if (vnodeProps[key] !== undefined) {
+    for (const key in vnodeProps) {
+      if (key in compProps || key.startsWith("on")) {
         props[key] = vnodeProps[key];
       } else {
-        attrs[key] = compProps[key];
+        attrs[key] = vnodeProps[key];
       }
     }
     return [props, attrs];
@@ -639,28 +673,6 @@ export const createRenderer = (options) => {
       }
     }
     return false;
-  };
-
-  /**
-   *
-   * @param {VNode} n1
-   * @param {VNode} n2
-   * @param {HTMLElement} anchor
-   */
-  const patchComponet = (n1, n2, anchor) => {
-    const instance = (n2.component = n1.component);
-    const { props } = instance;
-    if (hasPropsChanged(n1.props, n2.props)) {
-      const [nextProps] = resolveProps(n2.type.props, n2.props);
-      // 更新 props
-      for (const k in nextProps) {
-        props[k] = nextProps[k];
-      }
-      // 删除不存在的 props
-      for (const k in props) {
-        if (!(k in nextProps)) delete props[k];
-      }
-    }
   };
 
   /**

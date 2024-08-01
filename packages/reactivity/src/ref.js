@@ -1,4 +1,4 @@
-import { reactive, effect } from "./04.js";
+import { reactive, effect } from "./effect.js";
 
 export const ref = (value) => {
   const wapper = {

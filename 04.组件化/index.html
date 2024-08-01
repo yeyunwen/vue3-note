@@ -12,25 +12,40 @@
         createRenderer,
         DOM_API,
       } from "../packages/runtime-core/src/index.js";
+      import { ref } from "../dist/reactivity.esm-browser.js";
+      // import { ref } from "../packages/reactivity/src/ref.js";
 
       const renderer = createRenderer(DOM_API);
 
       const MyComponent = {
         name: "MyComponent",
-        data() {
+        props: {},
+        setup(props, { attrs, emit }) {
+          const count = ref(1);
+          setTimeout(() => {
+            count.value++;
+            emit("click", 112323);
+          }, 1000);
+
           return {
-            foo: "hello",
+            count,
           };
         },
         render() {
           return {
             type: "div",
-            children: `foo的值是${this.foo}`,
+            children: `count的值是${this.count.value}, props的值是${this.foo}`,
           };
         },
       };
       const CompVNode = {
         type: MyComponent,
+        props: {
+          onClick(...args) {
+            console.log("click", args);
+          },
+          foo: "hello",
+        },
       };
 
       renderer.render(CompVNode, document.querySelector("#app"));
