@@ -1,21 +1,7 @@
+//@ts-check
 const bucket = new WeakMap(); // 之所以用WeakMap，是因为WeakMap是弱引用。 而bucket中的的key是要代理的目标，如果目标不被用户使用，也就没有收集依赖的必要。
 let activeEffect = null;
 const effectStack = [];
-
-const jobQueue = new Set();
-const p = Promise.resolve();
-
-let isFlushing = false;
-const flushJobs = () => {
-  if (isFlushing) return;
-  isFlushing = true;
-  // job是异步任务，因此需要同步代码都执行完后，在下一轮事件循环中执行
-  p.then(() => {
-    jobQueue.forEach((job) => job());
-  }).finally(() => {
-    isFlushing = false;
-  });
-};
 
 const cleanup = (effectFn) => {
   for (const deps of effectFn.deps) {

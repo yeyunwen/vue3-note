@@ -17,10 +17,15 @@
 
       const MyComponent = {
         name: "MyComponent",
+        data() {
+          return {
+            foo: "hello",
+          };
+        },
         render() {
           return {
             type: "div",
-            children: "hello",
+            children: `foo的值是${this.foo}`,
           };
         },
       };

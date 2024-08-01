@@ -6,14 +6,23 @@ import {
   isNumber,
 } from "../../shared/src/general.js";
 import { Text, Comment, Fragment } from "./vnode.js";
+import { effect, reactive } from "../../../packages/reactivity/src/effect.js";
+import { queueJob } from "./scheduler.js";
 
 /**
+ * @typedef {{
+ * state: any,
+ * isMounted: boolean,
+ * subtree: VNode | null
+ * }} Instance
+ *
  * @typedef {{
  * type: string | object,
  * props: Record<string, any> | null,
  * children: string | VNode[]| null,
  * el: HTMLElement,
- * key: string | number | null
+ * key: string | number | null,
+ * component: Instance
  * }} VNode
  * */
 
@@ -496,9 +505,48 @@ export const createRenderer = (options) => {
    */
   const mountComponet = (vnode, container, anchor) => {
     const componentOptions = vnode.type;
-    const { render } = componentOptions;
-    const subTree = render();
-    patch(null, subTree, container, anchor);
+    const {
+      render,
+      data,
+      beforeCreate,
+      created,
+      beforeMount,
+      mounted,
+      beforeUpdate,
+      updated,
+    } = componentOptions;
+
+    beforeCreate && beforeCreate();
+    const state = reactive(data());
+
+    /**@type {Instance} */
+    const instance = {
+      state,
+      isMounted: false,
+      subtree: null,
+    };
+    vnode.component = instance;
+    created && created.call(state);
+
+    effect(
+      () => {
+        const subTree = render.call(state, state);
+        if (!instance.isMounted) {
+          beforeMount && beforeMount.call(state);
+          patch(null, subTree, container, anchor);
+          instance.isMounted = true;
+          mounted && mounted.call(state);
+        } else {
+          beforeUpdate && beforeUpdate.call(state);
+          patch(instance.subtree, subTree, container, anchor);
+          updated && updated.call(state);
+        }
+        instance.subtree = subTree;
+      },
+      {
+        scheduler: queueJob,
+      }
+    );
   };
 
   const patchComponet = (n1, n2, anchor) => {};
