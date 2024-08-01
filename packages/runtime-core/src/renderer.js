@@ -6,14 +6,19 @@ import {
   isNumber,
 } from "../../shared/src/general.js";
 import { Text, Comment, Fragment } from "./vnode.js";
-import { effect, reactive } from "../../../packages/reactivity/src/effect.js";
+import {
+  effect,
+  reactive,
+  shallowReactive,
+} from "../../../packages/reactivity/src/effect.js";
 import { queueJob } from "./scheduler.js";
 
 /**
  * @typedef {{
  * state: any,
  * isMounted: boolean,
- * subtree: VNode | null
+ * subtree: VNode | null,
+ * props: Record<string | symbol, any>
  * }} Instance
  *
  * @typedef {{
@@ -508,6 +513,7 @@ export const createRenderer = (options) => {
     const {
       render,
       data,
+      props: propsOptions,
       beforeCreate,
       created,
       beforeMount,
@@ -518,15 +524,49 @@ export const createRenderer = (options) => {
 
     beforeCreate && beforeCreate();
     const state = reactive(data());
+    const [props, attrs] = resolveProps(propsOptions, vnode.props);
 
     /**@type {Instance} */
     const instance = {
       state,
+      props: shallowReactive(props),
       isMounted: false,
       subtree: null,
     };
     vnode.component = instance;
-    created && created.call(state);
+    const renderContext = new Proxy(instance, {
+      get(target, key, receiver) {
+        const { state, props } = target;
+        if (state && key in state) {
+          return state[key];
+        } else if (props && key in props) {
+          return props[key];
+        } else {
+          console.error("不存在");
+        }
+      },
+      set(target, key, newValue, reactive) {
+        const { state, props } = target;
+        if (state && key in state) {
+          return (state[key] = newValue);
+        } else if (props && key in props) {
+          return (props[key] = newValue);
+        } else {
+          console.error("不存在");
+        }
+      },
+    });
+    created && created.call(renderContext);
+
+    /**
+     * 将组件属性和虚拟节点属性合并为 props 和 attrs 对象
+     * 如果 vnodeProps 中的属性在 compProps 中存在，则将其值赋予 props 对象中的同名属性
+     * 如果 vnodeProps 中的属性在 compProps 中不存在，则将其值赋予 attrs 对象中的同名属性
+     * 返回一个包含 props 和 attrs 对象的数组
+     * @param {Object} compProps - 组件属性对象
+     * @param {Object} vnodeProps - 虚拟节点属性对象
+     * @return {Array} - 一个包含 props 和 attrs 对象的数组
+     */
 
     effect(
       () => {
@@ -549,7 +589,63 @@ export const createRenderer = (options) => {
     );
   };
 
-  const patchComponet = (n1, n2, anchor) => {};
+  const resolveProps = (compProps, vnodeProps) => {
+    const props = {};
+    const attrs = {};
+    for (const key in compProps) {
+      if (vnodeProps[key] !== undefined) {
+        props[key] = vnodeProps[key];
+      } else {
+        attrs[key] = compProps[key];
+      }
+    }
+    return [props, attrs];
+  };
+
+  /**
+   * 检查对象的属性是否发生了变化
+   * 通过遍历旧属性对象和新属性对象来实现
+   * 只要有一个属性值在新旧对象之间不匹配，就返回 true，表示属性发生了变化
+   * 最后，如果两个遍历都结束了且没有发现变化，则返回 false
+   *
+   * @param {Object} oldProps - 旧的属性对象
+   * @param {Object} newProps - 新的属性对象
+   * @return {boolean} - 属性是否发生变化的指示
+   */
+  const hasPropsChanged = (oldProps, newProps) => {
+    const newKeys = Object.keys(newProps);
+    if (newKeys.length !== Object.keys(oldProps).length) {
+      return true;
+    }
+    for (const key of newKeys) {
+      if (oldProps[key] !== newProps[key]) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  /**
+   *
+   * @param {VNode} n1
+   * @param {VNode} n2
+   * @param {HTMLElement} anchor
+   */
+  const patchComponet = (n1, n2, anchor) => {
+    const instance = (n2.component = n1.component);
+    const { props } = instance;
+    if (hasPropsChanged(n1.props, n2.props)) {
+      const [nextProps] = resolveProps(n2.type.props, n2.props);
+      // 更新 props
+      for (const k in nextProps) {
+        props[k] = nextProps[k];
+      }
+      // 删除不存在的 props
+      for (const k in props) {
+        if (!(k in nextProps)) delete props[k];
+      }
+    }
+  };
 
   /**
    *
