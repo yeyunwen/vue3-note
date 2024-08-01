@@ -21,6 +21,7 @@ import { queueJob } from "./scheduler.js";
  * isMounted: boolean,
  * subtree: VNode | null,
  * props: Record<string | symbol, any>,
+ * mounted: (() => void)[]
  * }} Instance
  *
  * @typedef {{
@@ -114,6 +115,17 @@ export const DOM_API = {
       el.setAttribute(key, nextValue);
     }
   },
+};
+
+let currentInstance = null;
+const setCurrentInstance = (instance) => (currentInstance = instance);
+
+export const onMounted = (fn) => {
+  if (currentInstance) {
+    currentInstance.mounted.push(fn);
+  } else {
+    console.error("onMounted 当前没有实例");
+  }
 };
 
 const getSequence = (arr) => {
@@ -239,9 +251,9 @@ export const createRenderer = (options) => {
         } else if (isObject(type)) {
           // 组件
           if (!n1) {
-            mountComponet(n2, container, anchor);
+            mountComponent(n2, container, anchor);
           } else {
-            patchComponet(n1, n2, anchor);
+            patchComponent(n1, n2, anchor);
           }
         }
       }
@@ -511,7 +523,7 @@ export const createRenderer = (options) => {
    * @param {HTMLElement} container
    * @param {HTMLElement} anchor
    */
-  const mountComponet = (vnode, container, anchor) => {
+  const mountComponent = (vnode, container, anchor) => {
     const componentOptions = vnode.type;
     const {
       data,
@@ -536,6 +548,7 @@ export const createRenderer = (options) => {
       props: shallowReactive(props),
       isMounted: false,
       subtree: null,
+      mounted: [],
     };
     /**
      *
@@ -551,7 +564,9 @@ export const createRenderer = (options) => {
     };
 
     const setupContext = { attrs, emit };
+    setCurrentInstance(instance);
     const setupResult = setup(shallowReadonly(instance.props), setupContext);
+    setCurrentInstance(null);
     let setupState = null;
     if (isFunction(setupResult)) {
       render = setupResult;
@@ -599,16 +614,17 @@ export const createRenderer = (options) => {
 
     effect(
       () => {
-        const subTree = render.call(renderContext, state);
+        const subTree = render.call(renderContext);
         if (!instance.isMounted) {
-          beforeMount && beforeMount.call(state);
+          beforeMount && beforeMount.call(renderContext);
           patch(null, subTree, container, anchor);
           instance.isMounted = true;
-          mounted && mounted.call(state);
+          mounted && mounted.call(renderContext);
+          instance.mounted.forEach((fn) => fn.call(renderContext));
         } else {
-          beforeUpdate && beforeUpdate.call(state);
+          beforeUpdate && beforeUpdate.call(renderContext);
           patch(instance.subtree, subTree, container, anchor);
-          updated && updated.call(state);
+          updated && updated.call(renderContext);
         }
         instance.subtree = subTree;
       },
@@ -622,9 +638,9 @@ export const createRenderer = (options) => {
    *
    * @param {VNode} n1
    * @param {VNode} n2
-   * @param {HTMLElement} anchor
+   * @param {HTMLElement | null} anchor
    */
-  const patchComponet = (n1, n2, anchor) => {
+  const patchComponent = (n1, n2, anchor) => {
     const instance = (n2.component = n1.component);
     const { props } = instance;
     if (hasPropsChanged(n1.props, n2.props)) {

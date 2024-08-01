@@ -11,21 +11,26 @@
       import {
         createRenderer,
         DOM_API,
+        onMounted,
       } from "../packages/runtime-core/src/index.js";
-      import { ref } from "../dist/reactivity.esm-browser.js";
-      // import { ref } from "../packages/reactivity/src/ref.js";
+      import { ref } from "../packages/reactivity/src/ref.js";
 
       const renderer = createRenderer(DOM_API);
 
       const MyComponent = {
         name: "MyComponent",
-        props: {},
+        props: {
+          foo: "",
+        },
         setup(props, { attrs, emit }) {
           const count = ref(1);
           setTimeout(() => {
             count.value++;
             emit("click", 112323);
           }, 1000);
+          onMounted(() => {
+            console.log("onMounted");
+          });
 
           return {
             count,
